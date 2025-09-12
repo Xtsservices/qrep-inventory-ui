@@ -7,13 +7,14 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Separator } from './ui/separator';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { User, Upload, Save, X, Camera } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface ProfileScreenProps {
   currentUser: {
     name?: string;
     mobile?: string;
     avatar?: string;
+     logo?: string;
   };
   onUpdateProfile: (updatedUser: any) => void;
   onClose: () => void;
