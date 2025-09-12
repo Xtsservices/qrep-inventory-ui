@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from './ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { Plus, Eye, Edit, Trash2, User } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 const initialUsers = [
   {
@@ -60,6 +60,10 @@ export function UsersModule() {
   const validateForm = () => {
     if (!userFormData.name.trim()) {
       toast.error('Please enter user name');
+      return false;
+    }
+    if (!/^[A-Za-z\s]{2,50}$/.test(userFormData.name.trim())) {
+      toast.error('Name should contain only letters and spaces (min 2 characters)');
       return false;
     }
     if (!userFormData.mobileNumber.trim()) {
@@ -214,8 +218,12 @@ export function UsersModule() {
                   id="name"
                   placeholder="Enter full name"
                   value={userFormData.name}
-                  onChange={(e) => setUserFormData({ ...userFormData, name: e.target.value })}
+                  onChange={(e) => {
+                  const value = e.target.value.replace(/[^A-Za-z\s]/g, ''); // Only letters and spaces
+                  setUserFormData({ ...userFormData, name: value });
+                  }}
                 />
+
               </div>
 
               <div className="space-y-2">

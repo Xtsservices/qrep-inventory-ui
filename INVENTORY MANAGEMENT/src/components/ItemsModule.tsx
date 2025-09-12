@@ -7,8 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
-import { Plus, Edit, Trash2, Eye } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { Plus, Edit, Trash2 } from 'lucide-react';
+import { toast } from 'sonner'; // ✅ Correct import
 
 const initialItems = [
   { id: 'ITM001', name: 'Basmati Rice', type: 'Grains', status: 'Active' },
@@ -35,30 +35,49 @@ export function ItemsModule() {
     return `ITM${String(lastId + 1).padStart(3, '0')}`;
   };
 
+  // ✅ changed here: real-time restriction for alphabets & spaces only
+  const handleNameChange = (e) => {
+    const raw = e.target.value;
+    const filtered = raw.replace(/[^A-Za-z\s]/g, ''); // removes numbers & special chars
+    setFormData({ ...formData, name: filtered });
+  };
+
   const handleSubmit = () => {
-    if (!formData.name || !formData.type) {
+    const nameTrimmed = formData.name.trim();
+    const typeTrimmed = formData.type.trim();
+
+    // ✅ Check required fields
+    if (!nameTrimmed || !typeTrimmed) {
       toast.error('Please fill all required fields');
+      return;
+    }
+
+    // ✅ Check only alphabets & spaces
+    const nameRegex = /^[A-Za-z\s]+$/;
+    if (!nameRegex.test(nameTrimmed)) {
+      toast.error('Item Name should contain only alphabets (no numbers or special characters)');
       return;
     }
 
     if (editingItem) {
       setItems(items.map(item => 
         item.id === editingItem.id 
-          ? { ...item, name: formData.name, type: formData.type }
+          ? { ...item, name: nameTrimmed, type: typeTrimmed }
           : item
       ));
       toast.success('Item updated successfully!');
     } else {
       const newItem = {
         id: generateItemId(),
-        name: formData.name,
-        type: formData.type,
+        name: nameTrimmed,
+        type: typeTrimmed,
         status: 'Active'
       };
       setItems([...items, newItem]);
       toast.success('Item added successfully!');
     }
 
+    // Reset form
     setFormData({ name: '', type: '' });
     setEditingItem(null);
     setShowAddDialog(false);
@@ -108,9 +127,9 @@ export function ItemsModule() {
                 <Label htmlFor="name">Item Name *</Label>
                 <Input
                   id="name"
-                  placeholder="Enter item name"
+                  placeholder="Enter item name (alphabets only)"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={handleNameChange} // ✅ changed here
                 />
               </div>
               <div className="space-y-2">
@@ -154,6 +173,7 @@ export function ItemsModule() {
                 <TableHead>ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -163,6 +183,11 @@ export function ItemsModule() {
                   <TableCell className="font-mono">{item.id}</TableCell>
                   <TableCell>{item.name}</TableCell>
                   <TableCell>{item.type}</TableCell>
+                  <TableCell>
+                    <Badge variant={item.status === 'Active' ? 'default' : 'secondary'}>
+                      {item.status}
+                    </Badge>
+                  </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
                       <Button
