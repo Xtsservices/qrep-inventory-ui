@@ -8,7 +8,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
-import { Plus, Eye, Edit, Trash2 } from 'lucide-react';
+
+import { Plus, Eye, Edit, Trash2, User } from 'lucide-react';
+
 import { toast } from 'sonner';
 
 const initialUsers = [

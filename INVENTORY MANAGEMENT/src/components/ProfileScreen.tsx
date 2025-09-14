@@ -14,6 +14,7 @@ interface ProfileScreenProps {
     name?: string;
     mobile?: string;
     avatar?: string;
+     logo?: string;
   };
   onUpdateProfile: (updatedUser: any) => void;
   onClose: () => void;

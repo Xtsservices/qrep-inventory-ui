@@ -13,7 +13,8 @@ import {
 } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+
+import { Plus, Edit, Trash2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_URL = 'http://172.16.4.151:9000/api/items';

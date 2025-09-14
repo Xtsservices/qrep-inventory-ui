@@ -7,18 +7,20 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Package } from 'lucide-react';
 import { toast } from 'sonner';
 
-export function LoginPage({ onLogin }) {
-  const [mobileNumber, setMobileNumber] = useState('');
+export function LoginPage({ onLogin }: { onLogin: any }) {
+  
+  const [mobileNumber, setMobileNumber] =useState('');
   const [showOtpStep, setShowOtpStep] = useState(false);
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSendOtp = () => {
-    if (mobileNumber.length !== 10) {
-      toast.error('Please enter a valid 10-digit mobile number');
-      return;
-    }
+ const handleSendOtp = () => {
+  const indianRegex = /^[6-9]\d{9}$/; 
 
+  if (!indianRegex.test(mobileNumber)) {
+    toast.error('Please enter a valid Indian mobile number');
+    return;
+  }
     setIsLoading(true);
     // Simulate API call
     setTimeout(() => {
@@ -57,7 +59,7 @@ export function LoginPage({ onLogin }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center mb-4">
@@ -80,12 +82,14 @@ export function LoginPage({ onLogin }) {
                   type="tel"
                   placeholder="Enter 10-digit mobile number"
                   value={mobileNumber}
-                  onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  onChange={(e) =>
+                    setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10))
+                  }
                   maxLength={10}
                 />
               </div>
-              <Button 
-                onClick={handleSendOtp} 
+              <Button
+                onClick={handleSendOtp}
                 className="w-full"
                 disabled={isLoading || mobileNumber.length !== 10}
               >
@@ -116,16 +120,16 @@ export function LoginPage({ onLogin }) {
                   className="text-center text-lg tracking-widest"
                 />
               </div>
-              <Button 
-                onClick={handleVerifyOtp} 
+              <Button
+                onClick={handleVerifyOtp}
                 className="w-full"
                 disabled={isLoading || otp.length !== 6}
               >
                 {isLoading ? 'Verifying...' : 'Verify & Login'}
               </Button>
-              <Button 
+              <Button
                 variant="outline"
-                onClick={handleBack} 
+                onClick={handleBack}
                 className="w-full"
                 disabled={isLoading}
               >
@@ -133,11 +137,11 @@ export function LoginPage({ onLogin }) {
               </Button>
             </>
           )}
-          
+
           <div className="text-center text-sm text-muted-foreground">
             <div className="bg-muted/50 p-3 rounded-lg">
               <p className="font-medium">Demo Credentials:</p>
-              <p>Mobile: Any 10-digit number</p>
+              <p>Mobile: Any Indian number (starts with 6–9)</p>
               <p>OTP: 123456</p>
             </div>
           </div>
