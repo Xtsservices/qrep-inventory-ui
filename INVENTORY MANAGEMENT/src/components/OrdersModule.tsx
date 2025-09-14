@@ -325,6 +325,7 @@ export function OrdersModule() {
                   <Label htmlFor="quantity">Quantity</Label>
                   <Input
                     id="quantity"
+                    type="number"
                     placeholder="Enter quantity"
                     value={orderFormData.quantity}
                     onChange={(e) => setOrderFormData({ ...orderFormData, quantity: e.target.value })}
