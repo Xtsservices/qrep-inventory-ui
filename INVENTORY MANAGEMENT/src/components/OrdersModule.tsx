@@ -1,200 +1,146 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
-import { Checkbox } from './ui/checkbox';
-import { Plus, Eye, Edit, X } from 'lucide-react';
+import { Plus, Edit, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-const initialOrders = [
-  {
-    id: 'ORD001',
-    vendorName: 'Fresh Foods Suppliers',
-    date: '2024-01-15',
-    items: ['Basmati Rice', 'Toor Dal'],
-    status: 'Pending',
-    totalAmount: null
-  },
-  {
-    id: 'ORD002',
-    vendorName: 'Grain Masters',
-    date: '2024-01-14',
-    items: ['Refined Oil'],
-    status: 'Completed',
-    totalAmount: 2500
-  }
-];
-
-const vendors = ['Fresh Foods Suppliers', 'Grain Masters', 'Spice World'];
-const availableItems = [
-  'Basmati Rice', 'Toor Dal', 'Refined Oil', 'Onions', 'Turmeric Powder',
-  'Wheat Flour', 'Sugar', 'Salt', 'Cumin Seeds', 'Coriander Seeds'
-];
+const API_VENDORS = 'http://172.16.4.220:9000/api/vendors';
+const API_ORDERS = 'http://172.16.4.220:9000/api/orders';
 
 export function OrdersModule() {
-  const [orders, setOrders] = useState(initialOrders);
+  const [vendors, setVendors] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [showPlaceOrderDialog, setShowPlaceOrderDialog] = useState(false);
   const [showEditOrderDialog, setShowEditOrderDialog] = useState(false);
   const [showViewOrderDialog, setShowViewOrderDialog] = useState(false);
-  const [editingOrder, setEditingOrder] = useState(null);
-  const [viewingOrder, setViewingOrder] = useState(null);
+  const [editingOrder, setEditingOrder] = useState<any>(null);
+  const [viewingOrder, setViewingOrder] = useState<any>(null);
+
   const [orderFormData, setOrderFormData] = useState({
     orderType: 'single',
     vendor: '',
     singleItem: '',
-    multipleItems: [],
-    bulkItems: [],
+    bulkItems: [{ name: '', quantity: '' }],
     quantity: '',
     notes: ''
   });
+
   const [editFormData, setEditFormData] = useState({
     itemPrices: []
   });
 
-  const generateOrderId = () => {
-    const lastId = orders.length > 0 ? 
-      Math.max(...orders.map(order => parseInt(order.id.replace('ORD', '')))) : 0;
-    return `ORD${String(lastId + 1).padStart(3, '0')}`;
+  const [availableItems, setAvailableItems] = useState<string[]>([]);
+
+  // Fetch vendors
+  useEffect(() => {
+    fetch(API_VENDORS)
+      .then(res => res.json())
+      .then(data => setVendors(data.data || []))
+      .catch(err => console.error('Vendor fetch error', err));
+  }, []);
+
+  // Fetch orders
+  const fetchOrders = () => {
+    fetch(API_ORDERS)
+      .then(res => res.json())
+      .then(data => setOrders(data.data || []))
+      .catch(err => console.error('Orders fetch error', err));
   };
 
-  const handlePlaceOrder = () => {
-    if (!orderFormData.vendor) {
-      toast.error('Please select a vendor');
-      return;
-    }
+  useEffect(() => {
+    fetchOrders();
+  }, []);
 
-    let selectedItems = [];
+  // Place order
+  const handlePlaceOrder = async () => {
+    if (!orderFormData.vendor) return toast.error('Select vendor');
+
+    let items: any[] = [];
     if (orderFormData.orderType === 'single') {
-      if (!orderFormData.singleItem) {
-        toast.error('Please select an item');
-        return;
-      }
-      selectedItems = [orderFormData.singleItem];
+      if (!orderFormData.singleItem) return toast.error('Select item');
+      items = [{ name: orderFormData.singleItem, quantity: orderFormData.quantity }];
     } else {
-      const validBulkItems = orderFormData.bulkItems.filter(item => item.name && item.quantity);
-      if (validBulkItems.length === 0) {
-        toast.error('Please add at least one item with quantity');
-        return;
-      }
-      selectedItems = validBulkItems.map(item => `${item.name} (${item.quantity})`);
+      const validBulkItems = orderFormData.bulkItems.filter(i => i.name && i.quantity);
+      if (validBulkItems.length === 0) return toast.error('Add at least one item with quantity');
+      items = validBulkItems;
     }
 
-    const newOrder = {
-      id: generateOrderId(),
-      vendorName: orderFormData.vendor,
-      date: new Date().toISOString().split('T')[0],
-      items: selectedItems,
-      status: 'Pending',
-      totalAmount: null,
-      quantity: orderFormData.quantity,
-      notes: orderFormData.notes
-    };
-
-    setOrders([...orders, newOrder]);
-    toast.success('Order placed successfully!');
-    
-    setOrderFormData({
-      orderType: 'single',
-      vendor: '',
-      singleItem: '',
-      multipleItems: [],
-      bulkItems: [],
-      quantity: '',
-      notes: ''
-    });
-    setShowPlaceOrderDialog(false);
+    try {
+      const res = await fetch(API_ORDERS, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor: orderFormData.vendor, items, notes: orderFormData.notes })
+      });
+      if (!res.ok) throw new Error('Failed to place order');
+      toast.success('Order placed successfully!');
+      setShowPlaceOrderDialog(false);
+      setOrderFormData({ orderType: 'single', vendor: '', singleItem: '', bulkItems: [{ name: '', quantity: '' }], quantity: '', notes: '' });
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to place order');
+    }
   };
 
-  const handleEditOrder = (order) => {
+  // Edit order
+  const handleEditOrder = (order: any) => {
     setEditingOrder(order);
-    setEditFormData({
-      itemPrices: order.items.map(item => ({ item, price: '' }))
-    });
+    setEditFormData({ itemPrices: order.items.map((item: any) => ({ item, price: item.price || '' })) });
     setShowEditOrderDialog(true);
   };
 
-  const handleViewOrder = (order) => {
+  const handleUpdateOrder = async () => {
+    const totalAmount = editFormData.itemPrices.reduce((sum, item) => sum + (parseFloat(item.price) || 0), 0);
+    const updatedOrder = { ...editingOrder, items: editFormData.itemPrices, totalAmount, status: 'Completed' };
+
+    try {
+      const res = await fetch(`${API_ORDERS}/${editingOrder.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedOrder)
+      });
+      if (!res.ok) throw new Error('Failed to update order');
+      toast.success('Order updated!');
+      setShowEditOrderDialog(false);
+      setEditingOrder(null);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update order');
+    }
+  };
+
+  // View order
+  const handleViewOrder = (order: any) => {
     setViewingOrder(order);
     setShowViewOrderDialog(true);
   };
 
-  const handleUpdateOrder = () => {
-    const totalAmount = editFormData.itemPrices.reduce((sum, item) => {
-      return sum + (parseFloat(item.price) || 0);
-    }, 0);
-
-    setOrders(orders.map(order => 
-      order.id === editingOrder.id 
-        ? { ...order, status: 'Completed', totalAmount }
-        : order
-    ));
-    toast.success('Order updated successfully!');
-    setShowEditOrderDialog(false);
+  // Bulk item handlers
+  const addBulkItem = () => setOrderFormData({ ...orderFormData, bulkItems: [...orderFormData.bulkItems, { name: '', quantity: '' }] });
+  const removeBulkItem = (index: number) => setOrderFormData({ ...orderFormData, bulkItems: orderFormData.bulkItems.filter((_, i) => i !== index) });
+  const updateBulkItem = (index: number, field: string, value: string) => {
+    const newBulk = [...orderFormData.bulkItems];
+    newBulk[index][field] = value;
+    setOrderFormData({ ...orderFormData, bulkItems: newBulk });
   };
-
-  const handleMultipleItemChange = (item, checked) => {
-    if (checked) {
-      setOrderFormData({
-        ...orderFormData,
-        multipleItems: [...orderFormData.multipleItems, item]
-      });
-    } else {
-      setOrderFormData({
-        ...orderFormData,
-        multipleItems: orderFormData.multipleItems.filter(i => i !== item)
-      });
-    }
-  };
-
-  const addBulkItem = () => {
-    setOrderFormData({
-      ...orderFormData,
-      bulkItems: [...orderFormData.bulkItems, { name: '', quantity: '' }]
-    });
-  };
-
-  const removeBulkItem = (index) => {
-    if (orderFormData.bulkItems.length > 1) {
-      const newBulkItems = orderFormData.bulkItems.filter((_, i) => i !== index);
-      setOrderFormData({ ...orderFormData, bulkItems: newBulkItems });
-    }
-  };
-
-  const updateBulkItem = (index, field, value) => {
-    const newBulkItems = [...orderFormData.bulkItems];
-    newBulkItems[index][field] = value;
-    setOrderFormData({ ...orderFormData, bulkItems: newBulkItems });
-  };
-
-  // Initialize bulk items when switching to bulk mode
-  React.useEffect(() => {
-    if (orderFormData.orderType === 'bulk' && orderFormData.bulkItems.length === 0) {
-      setOrderFormData({
-        ...orderFormData,
-        bulkItems: [{ name: '', quantity: '' }]
-      });
-    }
-  }, [orderFormData.orderType]);
 
   return (
     <div className="space-y-6">
+      {/* Header & Place Order */}
       <div className="flex justify-between items-center">
-        <div>
-          <p className="text-muted-foreground">Manage vendor orders and purchases</p>
-        </div>
+        <p className="text-muted-foreground">Manage vendor orders</p>
         <Dialog open={showPlaceOrderDialog} onOpenChange={setShowPlaceOrderDialog}>
           <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Place Order
-            </Button>
+            <Button><Plus className="w-4 h-4 mr-2" />Place Order</Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -202,160 +148,70 @@ export function OrdersModule() {
               <DialogDescription>Create a new order for vendor supplies</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              {/* Order Type */}
               <div className="space-y-3">
                 <Label>Order Type</Label>
-                <RadioGroup 
-                  value={orderFormData.orderType} 
-                  onValueChange={(value) => setOrderFormData({ ...orderFormData, orderType: value })}
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="single" id="single" />
-                    <Label htmlFor="single">Single Item</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="bulk" id="bulk" />
-                    <Label htmlFor="bulk">Bulk Items</Label>
-                  </div>
+                <RadioGroup value={orderFormData.orderType} onValueChange={(val) => setOrderFormData({ ...orderFormData, orderType: val })}>
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="single" id="single" /><Label htmlFor="single">Single Item</Label></div>
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="bulk" id="bulk" /><Label htmlFor="bulk">Bulk Items</Label></div>
                 </RadioGroup>
               </div>
 
+              {/* Vendor */}
               <div className="space-y-2">
-                <Label htmlFor="vendor">Vendor Name *</Label>
-                <Select
-                  value={orderFormData.vendor}
-                  onValueChange={(value) => setOrderFormData({ ...orderFormData, vendor: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select vendor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {vendors.map(vendor => (
-                      <SelectItem key={vendor} value={vendor}>{vendor}</SelectItem>
-                    ))}
-                  </SelectContent>
+                <Label>Vendor *</Label>
+                <Select value={orderFormData.vendor} onValueChange={(val) => setOrderFormData({ ...orderFormData, vendor: val })}>
+                  <SelectTrigger><SelectValue placeholder="Select vendor" /></SelectTrigger>
+                  <SelectContent>{vendors.map(v => <SelectItem key={v.id} value={v.vendorName || v.name}>{v.vendorName || v.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
 
+              {/* Items */}
               {orderFormData.orderType === 'single' ? (
                 <div className="space-y-2">
-                  <Label htmlFor="singleItem">Select Item *</Label>
-                  <Select
-                    value={orderFormData.singleItem}
-                    onValueChange={(value) => setOrderFormData({ ...orderFormData, singleItem: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select item" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableItems.map(item => (
-                        <SelectItem key={item} value={item}>{item}</SelectItem>
-                      ))}
-                    </SelectContent>
+                  <Label>Select Item *</Label>
+                  <Select value={orderFormData.singleItem} onValueChange={(val) => setOrderFormData({ ...orderFormData, singleItem: val })}>
+                    <SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger>
+                    <SelectContent>{availableItems.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
                   </Select>
+                  <Label>Quantity</Label>
+                  <Input type="number" value={orderFormData.quantity} onChange={(e) => setOrderFormData({ ...orderFormData, quantity: e.target.value })} />
                 </div>
               ) : (
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <Label>Items with Quantities *</Label>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={addBulkItem}
-                    >
-                      <Plus className="w-3 h-3 mr-1" />
-                      Add Item
-                    </Button>
+                    <Button size="sm" variant="outline" onClick={addBulkItem}><Plus className="w-3 h-3 mr-1" />Add Item</Button>
                   </div>
-                  
-                  <div className="space-y-3 max-h-60 overflow-y-auto">
-                    {orderFormData.bulkItems.map((item, index) => (
-                      <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
-                        <div className="flex-1">
-                          <Label className="text-xs text-muted-foreground mb-1 block">Item Name</Label>
-                          <Select
-                            value={item.name}
-                            onValueChange={(value) => updateBulkItem(index, 'name', value)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select item" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableItems.map(itemName => (
-                                <SelectItem key={itemName} value={itemName}>{itemName}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <div className="flex-1">
-                          <Label className="text-xs text-muted-foreground mb-1 block">Quantity</Label>
-                          <Input
-                            placeholder="e.g., 10 kg, 5 liters"
-                            value={item.quantity}
-                            onChange={(e) => updateBulkItem(index, 'quantity', e.target.value)}
-                          />
-                        </div>
-                        
-                        {orderFormData.bulkItems.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeBulkItem(index)}
-                            className="text-red-600 hover:text-red-600 mt-5"
-                          >
-                            <X className="w-3 h-3" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {orderFormData.bulkItems.length === 0 && (
-                    <div className="text-center py-4 text-muted-foreground border rounded-lg border-dashed">
-                      Click "Add Item" to start adding items
+                  {orderFormData.bulkItems.map((item, idx) => (
+                    <div key={idx} className="flex gap-3 p-3 border rounded-lg">
+                      <Select value={item.name} onValueChange={(val) => updateBulkItem(idx, 'name', val)}>
+                        <SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger>
+                        <SelectContent>{availableItems.map(it => <SelectItem key={it} value={it}>{it}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <Input placeholder="Quantity" value={item.quantity} onChange={(e) => updateBulkItem(idx, 'quantity', e.target.value)} />
+                      {orderFormData.bulkItems.length > 1 && <Button size="sm" variant="outline" className="text-red-600" onClick={() => removeBulkItem(idx)}><X className="w-3 h-3" /></Button>}
                     </div>
-                  )}
+                  ))}
                 </div>
               )}
 
-              {orderFormData.orderType === 'single' && (
-                <div className="space-y-2">
-                  <Label htmlFor="quantity">Quantity</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    placeholder="Enter quantity"
-                    value={orderFormData.quantity}
-                    onChange={(e) => setOrderFormData({ ...orderFormData, quantity: e.target.value })}
-                  />
-                </div>
-              )}
-
+              {/* Notes */}
               <div className="space-y-2">
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  placeholder="Additional notes or instructions"
-                  value={orderFormData.notes}
-                  onChange={(e) => setOrderFormData({ ...orderFormData, notes: e.target.value })}
-                />
+                <Label>Notes</Label>
+                <Textarea value={orderFormData.notes} onChange={(e) => setOrderFormData({ ...orderFormData, notes: e.target.value })} />
               </div>
 
               <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setShowPlaceOrderDialog(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handlePlaceOrder}>
-                  Place Order
-                </Button>
+                <Button variant="outline" onClick={() => setShowPlaceOrderDialog(false)}>Cancel</Button>
+                <Button onClick={handlePlaceOrder}>Place Order</Button>
               </div>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
+      {/* Orders List */}
       <Card>
         <CardHeader>
           <CardTitle>Orders List</CardTitle>
@@ -366,56 +222,26 @@ export function OrdersModule() {
             <TableHeader>
               <TableRow>
                 <TableHead>Order ID</TableHead>
-                <TableHead>Vendor Name</TableHead>
+                <TableHead>Vendor</TableHead>
                 <TableHead>Date</TableHead>
-                <TableHead>Item Count</TableHead>
+                <TableHead>Items</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Amount</TableHead>
+                <TableHead>Total</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {orders.map((order) => (
+              {orders.map(order => (
                 <TableRow key={order.id}>
-                  <TableCell className="font-mono">{order.id}</TableCell>
+                  <TableCell>{order.id}</TableCell>
                   <TableCell>{order.vendorName}</TableCell>
-                  <TableCell>{order.date}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center">
-                      <span className="font-medium">{order.items.length}</span>
-                      <span className="text-muted-foreground ml-1">
-                        {order.items.length === 1 ? 'item' : 'items'}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={order.status === 'Completed' ? 'default' : 'secondary'}>
-                      {order.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {order.totalAmount ? `₹${order.totalAmount}` : '-'}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewOrder(order)}
-                        title="View Order Details"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditOrder(order)}
-                        disabled={order.status === 'Completed'}
-                        title="Edit Order"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    </div>
+                  <TableCell>{new Date(order.date).toLocaleDateString()}</TableCell>
+                  <TableCell>{order.items?.length}</TableCell>
+                  <TableCell><Badge variant={order.status === 'Completed' ? 'default' : 'secondary'}>{order.status}</Badge></TableCell>
+                  <TableCell>{order.totalAmount ? `₹${order.totalAmount}` : '-'}</TableCell>
+                  <TableCell className="flex gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => handleViewOrder(order)}><Eye className="w-4 h-4" /></Button>
+                    <Button size="sm" variant="ghost" onClick={() => handleEditOrder(order)} disabled={order.status === 'Completed'}><Edit className="w-4 h-4" /></Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -428,117 +254,38 @@ export function OrdersModule() {
       <Dialog open={showViewOrderDialog} onOpenChange={setShowViewOrderDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Order Details</DialogTitle>
-            <DialogDescription>Complete information about the selected order</DialogDescription>
+            <DialogTitle>View Order</DialogTitle>
+            <DialogDescription>All details of this order</DialogDescription>
           </DialogHeader>
           {viewingOrder && (
-            <div className="space-y-6">
-              {/* Order Summary */}
-              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
-                <div>
-                  <Label className="text-sm text-muted-foreground">Order ID</Label>
-                  <p className="font-mono">{viewingOrder.id}</p>
-                </div>
-                <div>
-                  <Label className="text-sm text-muted-foreground">Date</Label>
-                  <p>{new Date(viewingOrder.date).toLocaleDateString('en-IN', {
-                    year: 'numeric',
-                    month: 'long', 
-                    day: 'numeric'
-                  })}</p>
-                </div>
-                <div>
-                  <Label className="text-sm text-muted-foreground">Vendor</Label>
-                  <p>{viewingOrder.vendorName}</p>
-                </div>
-                <div>
-                  <Label className="text-sm text-muted-foreground">Status</Label>
-                  <Badge variant={viewingOrder.status === 'Completed' ? 'default' : 'secondary'}>
-                    {viewingOrder.status}
-                  </Badge>
-                </div>
-                {viewingOrder.totalAmount && (
-                  <div className="col-span-2">
-                    <Label className="text-sm text-muted-foreground">Total Amount</Label>
-                    <p className="text-lg">₹{viewingOrder.totalAmount.toLocaleString()}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Items List */}
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground">Order ID: {viewingOrder.id} | Vendor: {viewingOrder.vendorName} | Status: {viewingOrder.status}</div>
+              <div><p className="font-semibold">Date:</p><p>{new Date(viewingOrder.date).toLocaleString()}</p></div>
+              <div><p className="font-semibold">Notes:</p><p>{viewingOrder.notes || '-'}</p></div>
               <div>
-                <Label className="text-sm text-muted-foreground mb-3 block">Ordered Items</Label>
-                <div className="border rounded-lg">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Item Name</TableHead>
-                        <TableHead>Quantity</TableHead>
-                        <TableHead>Status</TableHead>
+                <p className="font-semibold">Items:</p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Price</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {viewingOrder.items.map((item: any, idx: number) => (
+                      <TableRow key={idx}>
+                        <TableCell>{item.name || item.item}</TableCell>
+                        <TableCell>{item.quantity || '-'}</TableCell>
+                        <TableCell>{item.price ? `₹${item.price}` : '-'}</TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {viewingOrder.items.map((item, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{item}</TableCell>
-                          <TableCell>{viewingOrder.quantity || 'Not specified'}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-xs">
-                              {viewingOrder.status}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-
-              {/* Additional Information */}
-              {viewingOrder.notes && (
-                <div>
-                  <Label className="text-sm text-muted-foreground mb-2 block">Notes</Label>
-                  <div className="p-3 bg-muted/30 rounded-lg border">
-                    <p className="text-sm">{viewingOrder.notes}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Order Timeline */}
-              <div>
-                <Label className="text-sm text-muted-foreground mb-3 block">Order Timeline</Label>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <div className="flex-1">
-                      <p className="text-sm">Order Placed</p>
-                      <p className="text-xs text-muted-foreground">{new Date(viewingOrder.date).toLocaleString()}</p>
-                    </div>
-                  </div>
-                  {viewingOrder.status === 'Completed' && (
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm">Order Completed</p>
-                        <p className="text-xs text-muted-foreground">Updated with pricing information</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setShowViewOrderDialog(false)}>
-                  Close
-                </Button>
-                {viewingOrder.status === 'Pending' && (
-                  <Button onClick={() => {
-                    setShowViewOrderDialog(false);
-                    handleEditOrder(viewingOrder);
-                  }}>
-                    Edit Order
-                  </Button>
-                )}
+              <div className="pt-2 font-semibold">Total Amount: {viewingOrder.totalAmount ? `₹${viewingOrder.totalAmount}` : '-'}</div>
+              <div className="flex justify-end pt-4">
+                <Button variant="outline" onClick={() => setShowViewOrderDialog(false)}>Close</Button>
               </div>
             </div>
           )}
@@ -557,7 +304,6 @@ export function OrdersModule() {
               <div className="text-sm text-muted-foreground">
                 Order ID: {editingOrder.id} | Vendor: {editingOrder.vendorName}
               </div>
-              
               <div className="space-y-3">
                 <Label>Enter Item Prices</Label>
                 {editFormData.itemPrices.map((itemPrice, index) => (
@@ -576,14 +322,9 @@ export function OrdersModule() {
                   </div>
                 ))}
               </div>
-
               <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setShowEditOrderDialog(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleUpdateOrder}>
-                  Update Order
-                </Button>
+                <Button variant="outline" onClick={() => setShowEditOrderDialog(false)}>Cancel</Button>
+                <Button onClick={handleUpdateOrder}>Update Order</Button>
               </div>
             </div>
           )}

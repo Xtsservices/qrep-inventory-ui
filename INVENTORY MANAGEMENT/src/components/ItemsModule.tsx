@@ -14,10 +14,11 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 
-import { Plus, Edit, Trash2, Eye } from 'lucide-react';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const API_URL = 'http://172.16.4.151:9000/api/items';
+// 👇 Use your backend URL here
+const API_URL = 'http://172.16.4.220:9000/api/items';
 
 export function ItemsModule() {
   const [items, setItems] = useState([]);
@@ -38,7 +39,7 @@ export function ItemsModule() {
 
       const normalizedItems = (Array.isArray(data) ? data : data?.data || data?.items || []).map(
         (item, index) => ({
-          id: item.id ?? item._id ?? index,
+          id: item.item_id ?? item.id ?? item._id ?? index,
           name: item.name,
           type: item.type,
           status: item.status,
@@ -141,7 +142,6 @@ export function ItemsModule() {
   // -----------------------------
   const handleDelete = async (item) => {
     try {
-      // Using item.id in template literal for the :item_id format
       const res = await fetch(`${API_URL}/${item.id}`, { method: 'DELETE' });
       if (!res.ok) {
         const text = await res.text();

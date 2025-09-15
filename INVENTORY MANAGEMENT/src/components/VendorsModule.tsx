@@ -30,7 +30,7 @@ import { Plus, Eye, Trash } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 
-const API_URL = "http://172.16.4.151:9000/api/vendors";
+const API_URL = "http://172.16.4.220:9000/api/vendors";
 
 
 export function VendorsModule() {
