@@ -30,7 +30,7 @@ import { Plus, Eye, Trash } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 
-const API_URL = "http://172.16.4.151:9000/api/vendors";
+const API_URL = "http://http://172.16.4.40:9000/api/orders";
 
 
 export function VendorsModule() {
@@ -173,14 +173,22 @@ const handleDelete = async (vendor_id: string) => {
   if (!confirm("Are you sure you want to delete this vendor?")) return;
 
   try {
+    console.log("Deleting vendor:", vendor_id); // debug
     await axios.delete(`${API_URL}/${vendor_id}`);
     toast.success("Vendor deleted successfully!");
-    fetchVendors(); // Refresh the list
-  } catch (error: any) {
-    console.error("Delete error:", error);
-    toast.error(error.response?.data?.message || "Failed to delete vendor");
+    fetchVendors();
+  }  catch (error: any) {
+  if (error.response) {
+    console.error("Delete error response:", error.response.data);
+    console.error("Status:", error.response.status);
+  } else {
+    console.error("Delete error:", error.message);
   }
+  toast.error(error.response?.data?.message || "Failed to delete vendor");
+}
+
 };
+
 
   return (
     <div className="space-y-6">

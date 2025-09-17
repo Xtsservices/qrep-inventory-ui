@@ -13,17 +13,29 @@ import {
 } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
-
-import { Plus, Edit, Trash2, Eye } from 'lucide-react';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const API_URL = 'http://172.16.4.151:9000/api/items';
+const API_URL = 'http://172.16.4.40:9000/api/items';
 
 export function ItemsModule() {
   const [items, setItems] = useState([]);
-  const [showDialog, setShowDialog] = useState(false);
+  const [showDialog, setShowDialog] = useState(false);  
   const [editingItem, setEditingItem] = useState(null);
-  const [formData, setFormData] = useState({ name: '', type: '' });
+
+  // ✅ Include kg + litres
+  const [formData, setFormData] = useState({ 
+    name: '', 
+    type: '', 
+    status: '1',
+    units: '',
+    kg: '',
+    grams: '',
+    litres: '',
+    
+  });
+
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const itemTypes = ['Grains', 'Pulses', 'Oil', 'Vegetables', 'Spices', 'Dairy', 'Others'];
 
@@ -35,17 +47,25 @@ export function ItemsModule() {
       const res = await fetch(API_URL);
       if (!res.ok) throw new Error('Failed to fetch items');
       const data = await res.json();
+      const raw = Array.isArray(data) ? data : data.data || [];
 
-      const normalizedItems = (Array.isArray(data) ? data : data?.data || data?.items || []).map(
-        (item, index) => ({
-          id: item.id ?? item._id ?? index,
-          name: item.name,
-          type: item.type,
-          status: item.status,
-        })
-      );
+      const normalizedItems = raw.map((item) => {
+        const id = item.item_id ?? item.id ?? item.itemId ?? null;
+        const name = item.item_name ?? item.name ?? item.itemName ?? '';
+        const type = item.type ?? item.item_type ?? item.category ?? '';
+       let status_id = Number(item.status_id ?? item.statusId ?? item.status ?? 1);
+if (![1, 2].includes(status_id)) status_id = 1; // default only if truly missing
 
-      setItems(normalizedItems);
+const status = status_id === 1 ? "Active" : "Inactive";
+
+        const units = item.units ?? '';
+        const grams = item.grams ?? '';
+        const kg = item.kg ?? item.kilograms ?? '';
+        const litres = item.litres ?? '';
+        return { id, name, type, status_id, status, units, kg, grams, litres };
+      });
+
+      setItems(normalizedItems.reverse());
     } catch (err) {
       console.error(err);
       toast.error('Error fetching items');
@@ -59,108 +79,145 @@ export function ItemsModule() {
   // -----------------------------
   // HANDLE FORM CHANGES
   // -----------------------------
-  const handleNameChange = (e) => {
-    const filtered = e.target.value.replace(/[^A-Za-z\s]/g, '');
-    setFormData({ ...formData, name: filtered });
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleTypeChange = (value) => {
-    setFormData({ ...formData, type: value });
-  };
+  const handleTypeChange = (value) => setFormData({ ...formData, type: value });
 
   // -----------------------------
   // SUBMIT ADD OR EDIT
   // -----------------------------
-  const handleSubmit = async () => {
-    const nameTrimmed = formData.name.trim();
-    const typeTrimmed = formData.type.trim().toLowerCase();
-    const status = 1;
+const handleSubmit = async () => {
+    const nameTrimmed = (formData.name || '').trim();
+    const typeTrimmed = (formData.type || '').trim();
 
     if (!nameTrimmed || !typeTrimmed) {
       toast.error('Please fill all required fields');
       return;
     }
 
-    if (!/^[A-Za-z\s]+$/.test(nameTrimmed)) {
-      toast.error('Item Name should contain only alphabets');
+    if (!/^[A-Za-z\s\-&()\.]+$/.test(nameTrimmed)) {
+      toast.error('Item Name should contain only alphabets or allowed characters');
       return;
     }
 
+    if (!formData.units && !formData.kg && !formData.grams && !formData.litres) {
+      toast.error('Please enter at least one quantity (Units, Kg, Grams, or Litres)');
+      return;
+    }
+
+    // Duplicate check before adding
+    if (!editingItem) {
+      const duplicate = items.find(
+        (i) => i.name.toLowerCase() === nameTrimmed.toLowerCase()
+      );
+      if (duplicate) {
+        toast.error(`Item "${nameTrimmed}" already exists!`);
+        return;
+      }
+    }
+
+    const payload = {
+      item_name: nameTrimmed,
+      type: typeTrimmed,
+      status_id: Number(formData.status),
+      units: Number(formData.units) || 0,
+      kg: Number(formData.kg) || 0,
+      grams: Number(formData.grams) || 0,
+      litres: Number(formData.litres) || 0,
+    };
+
     try {
-      if (editingItem) {
-        // ---------- EDIT ITEM ----------
-        const res = await fetch(`${API_URL}/${editingItem.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: nameTrimmed, type: typeTrimmed, status }),
-        });
+      const res = editingItem
+        ? await fetch(`${API_URL}/${editingItem.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+        : await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
 
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(`Failed to update item: ${text}`);
-        }
+      const data = await res.json().catch(() => ({}));
 
-        toast.success('Item updated successfully!');
-      } else {
-        // ---------- ADD ITEM ----------
-        const res = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: nameTrimmed, type: typeTrimmed, status }),
-        });
-
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(`Failed to add item: ${text}`);
-        }
-
-        toast.success('Item added successfully!');
+      if (res.status === 409) {
+        toast.error('This item already exists!');
+        return;
       }
 
+      if (!res.ok) throw new Error(data.error || data.message || 'Something went wrong');
+
+      toast.success(editingItem ? 'Item updated successfully!' : 'Item added successfully!');
       await fetchItems();
-      setEditingItem(null);
-      setFormData({ name: '', type: '' });
-      setShowDialog(false);
+      handleCloseDialog();
     } catch (err) {
       console.error(err);
-      toast.error('Something went wrong while saving item');
+      toast.error(err.message || 'Something went wrong');
     }
   };
 
   // -----------------------------
-  // EDIT ITEM BUTTON
+  // EDIT & DELETE (mark inactive)
   // -----------------------------
   const handleEdit = (item) => {
     setEditingItem(item);
-    setFormData({ name: item.name, type: item.type });
+    setFormData({
+      name: item.name,
+      type: item.type,
+      status: item.status_id.toString(),
+      units: item.units,
+      kg: item.kg,
+      grams: item.grams,
+      litres: item.litres,
+    });
     setShowDialog(true);
   };
+const handleDelete = async (item) => {
+  if (!confirm(`Are you sure you want to mark "${item.name}" as Inactive?`)) return;
 
-  // -----------------------------
-  // DELETE ITEM BUTTON
-  // -----------------------------
-  const handleDelete = async (item) => {
-    try {
-      // Using item.id in template literal for the :item_id format
-      const res = await fetch(`${API_URL}/${item.id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Delete failed: ${text}`);
-      }
+  try {
+    const payload = {
+      item_name: item.name,
+      item_type: item.type,
+      status_id: 2, // mark as inactive
+    };
 
-      toast.success('Item deleted successfully!');
-      setItems(items.filter((i) => i.id !== item.id));
-    } catch (err) {
-      console.error(err);
-      toast.error('Something went wrong while deleting item');
+    const itemId = item.id ?? item.item_id;
+    if (!itemId) throw new Error('Item ID missing');
+
+    const res = await fetch(`${API_URL}/${itemId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      // Try to parse backend error message
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || data.message || 'Failed to update item');
     }
-  };
+
+    toast.success(`Item "${item.name}" marked as Inactive!`);
+    await fetchItems();
+  } catch (err) {
+    console.error(err);
+    toast.error(err.message || 'Something went wrong while marking item inactive');
+  }
+};
+
 
   const handleCloseDialog = () => {
     setShowDialog(false);
     setEditingItem(null);
-    setFormData({ name: '', type: '' });
+    setFormData({ name: '', type: '', status: '1', units: '', kg: '', grams: '', litres: '' });
   };
+
+  const filteredItems = items.filter((item) =>
+    statusFilter === 'all' ? true : item.status_id === Number(statusFilter)
+  );
 
   // -----------------------------
   // RENDER
@@ -169,54 +226,127 @@ export function ItemsModule() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <p className="text-muted-foreground">Manage your inventory items</p>
-        <Dialog open={showDialog} onOpenChange={setShowDialog}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              {editingItem ? 'Edit Item' : 'Add Item (Provision)'}
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingItem ? 'Edit Item' : 'Add New Item'}</DialogTitle>
-              <div className="text-sm text-muted-foreground">
-                {editingItem ? 'Update item information' : 'Create a new inventory item'}
+
+        <div className="flex gap-2">
+          {/* Status Filter */}
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="1">Active</SelectItem>
+              <SelectItem value="2">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Add/Edit Dialog */}
+          <Dialog open={showDialog} onOpenChange={setShowDialog}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                {editingItem ? 'Edit Item' : 'Add Item'}
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingItem ? 'Edit Item' : 'Add New Item'}</DialogTitle>
+                <div className="text-sm text-muted-foreground">
+                  {editingItem ? 'Update item information' : 'Create a new inventory item'}
+                </div>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Item Name *</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    placeholder="Enter item name"
+                    value={formData.name}
+                    onChange={handleChange}
+                  />
+                </div>
+
+                {/* ✅ Units, Kg, Grams, Litres side by side */}
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <Label>Units</Label>
+                    <Input
+                      type="number"
+                      name="units"
+                      value={formData.units}
+                      onChange={handleChange}
+                      placeholder="Enter units"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label>Kg</Label>
+                    <Input
+                      type="number"
+                      name="kg"
+                      value={formData.kg}
+                      onChange={handleChange}
+                      placeholder="Enter Kg"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label>Grams</Label>
+                    <Input
+                      type="number"
+                      name="grams"
+                      value={formData.grams}
+                      onChange={handleChange}
+                      placeholder="Enter grams"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label>Litres</Label>
+                    <Input
+                      type="number"
+                      name="litres"
+                      value={formData.litres}
+                      onChange={handleChange}
+                      placeholder="Enter litres"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+  <Label htmlFor="type">Item Type *</Label>
+  <Select
+    value={formData.type || ''}     // ✅ ensure correct value is passed
+    onValueChange={handleTypeChange}
+  >
+    <SelectTrigger>
+      {/* ✅ show selected type instead of placeholder */}
+      <SelectValue placeholder="Select item type">
+        {formData.type || 'Select item type'}
+      </SelectValue>
+    </SelectTrigger>
+    <SelectContent>
+      {itemTypes.map((t) => (
+        <SelectItem key={t} value={t}>
+          {t}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+</div>
+
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button variant="outline" onClick={handleCloseDialog}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSubmit}>
+                    {editingItem ? 'Update' : 'Add'} Item
+                  </Button>
+                </div>
               </div>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Item Name *</Label>
-                <Input
-                  id="name"
-                  placeholder="Enter item name (alphabets only)"
-                  value={formData.name}
-                  onChange={handleNameChange}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="type">Item Type *</Label>
-                <Select value={formData.type} onValueChange={handleTypeChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select item type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {itemTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={handleCloseDialog}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSubmit}>{editingItem ? 'Update' : 'Add'} Item</Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Card>
@@ -229,31 +359,44 @@ export function ItemsModule() {
             <TableHeader>
               <TableRow>
                 <TableHead>S.No</TableHead>
-                <TableHead>ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Quantity</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((item, index) => (
-                <TableRow key={item.id}>
+              {filteredItems.map((item, index) => (
+                <TableRow key={item.id ?? index}>
                   <TableCell>{index + 1}</TableCell>
-                  <TableCell className="font-mono">{item.id}</TableCell>
                   <TableCell>{item.name}</TableCell>
                   <TableCell>{item.type}</TableCell>
-                  <TableCell>
-                    <Badge variant={item.status === 1 ? 'default' : 'secondary'}>
-                      {item.status === 1 ? 'Active' : 'Inactive'}
-                    </Badge>
+ <TableCell>
+                    {[item.units ? `${item.units} Units` : null, item.kg ? `${item.kg} Kg` : null, item.grams ? `${item.grams} g` : null, item.litres ? `${item.litres} L` : null]
+                      .filter(Boolean)
+                      .join(', ') || 'N/A'}
                   </TableCell>
                   <TableCell>
+                    <Badge variant={item.status === 'Active' ? 'success' : 'destructive'}>
+                      {item.status}
+                    </Badge>
+                  </TableCell>
+
+                  <TableCell>
                     <div className="flex gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(item)}
+                      >
                         <Edit className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(item)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(item)}
+                      >
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>

@@ -1,66 +1,75 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
-import { Label } from './ui/label';
 import { Search } from 'lucide-react';
 
-const initialStock = [
-  { id: 1, itemName: 'Basmati Rice', quantity: 45, unit: 'kg', minThreshold: 10, status: 'Available' },
-  { id: 2, itemName: 'Toor Dal', quantity: 25, unit: 'kg', minThreshold: 5, status: 'Available' },
-  { id: 3, itemName: 'Refined Oil', quantity: 8, unit: 'liters', minThreshold: 10, status: 'Low Stock' },
-  { id: 4, itemName: 'Onions', quantity: 0, unit: 'kg', minThreshold: 5, status: 'Unavailable' },
-  { id: 5, itemName: 'Turmeric Powder', quantity: 3, unit: 'kg', minThreshold: 2, status: 'Available' },
-  { id: 6, itemName: 'Wheat Flour', quantity: 50, unit: 'kg', minThreshold: 15, status: 'Available' },
-  { id: 7, itemName: 'Sugar', quantity: 12, unit: 'kg', minThreshold: 8, status: 'Available' },
-  { id: 8, itemName: 'Salt', quantity: 0, unit: 'kg', minThreshold: 3, status: 'Unavailable' },
-  { id: 9, itemName: 'Cumin Seeds', quantity: 1, unit: 'kg', minThreshold: 2, status: 'Low Stock' },
-  { id: 10, itemName: 'Coriander Seeds', quantity: 15, unit: 'kg', minThreshold: 3, status: 'Available' }
-];
-
 export function StockAvailabilityModule() {
-  const [stock] = useState(initialStock);
+  const [stock, setStock] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all');
 
+  // Fetch stock data from API
+  useEffect(() => {
+    axios.get('http://172.16.4.40:9000/api/stocks')
+      .then(res => {
+        console.log("Raw stock from API:", res.data.data);
+        if (res.data.success) {
+          const transformed = res.data.data.map(item => ({
+  id: item.stock_id,
+  itemName: item.item_name,
+  quantity: item.quantity !== null && item.quantity !== undefined
+    ? parseFloat(item.quantity)
+    : 0, // fallback to 0
+  unit: item.unit || '-', 
+  minThreshold: item.min_threshold !== null && item.min_threshold !== undefined
+    ? parseFloat(item.min_threshold)
+    : 0,
+  status:
+    (parseFloat(item.quantity) || 0) === 0 ? 'Unavailable' :
+    (parseFloat(item.quantity) || 0) <= (parseFloat(item.min_threshold) || 0) ? 'Low Stock' :
+    'Available'
+}));
+
+          setStock(transformed);
+        }
+      })
+      .catch(err => console.error('Error fetching stock:', err));
+  }, []);
+
+  // Badge variant based on status
   const getStatusVariant = (status) => {
     switch (status) {
-      case 'Available':
-        return 'default';
-      case 'Low Stock':
-        return 'destructive';
-      case 'Unavailable':
-        return 'secondary';
-      default:
-        return 'secondary';
+      case 'Available': return 'default';
+      case 'Low Stock': return 'destructive';
+      case 'Unavailable': return 'secondary';
+      default: return 'secondary';
     }
   };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'Available':
-        return 'text-green-600';
-      case 'Low Stock':
-        return 'text-orange-600';
-      case 'Unavailable':
-        return 'text-red-600';
-      default:
-        return 'text-gray-600';
+      case 'Available': return 'text-green-600';
+      case 'Low Stock': return 'text-orange-600';
+      case 'Unavailable': return 'text-red-600';
+      default: return 'text-gray-600';
     }
   };
 
+  // Filter by search + tab
   const filteredStock = stock.filter(item => {
     const matchesSearch = item.itemName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTab = activeTab === 'all' || 
-                      (activeTab === 'available' && item.status === 'Available') ||
-                      (activeTab === 'unavailable' && item.status === 'Unavailable') ||
-                      (activeTab === 'low-stock' && item.status === 'Low Stock');
+    const matchesTab = activeTab === 'all' ||
+      (activeTab === 'available' && item.status === 'Available') ||
+      (activeTab === 'unavailable' && item.status === 'Unavailable') ||
+      (activeTab === 'low-stock' && item.status === 'Low Stock');
     return matchesSearch && matchesTab;
   });
 
+  // Summary counts
   const stockSummary = {
     available: stock.filter(item => item.status === 'Available').length,
     unavailable: stock.filter(item => item.status === 'Unavailable').length,
@@ -114,9 +123,9 @@ export function StockAvailabilityModule() {
         <CardHeader>
           <CardTitle>Stock Inventory</CardTitle>
           <CardDescription>Current stock levels for all items</CardDescription>
-          
+
           {/* Search Bar */}
-          <div className="flex items-center gap-2 max-w-sm">
+          <div className="flex items-center gap-2 max-w-sm mt-2">
             <div className="relative flex-1">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -128,6 +137,7 @@ export function StockAvailabilityModule() {
             </div>
           </div>
         </CardHeader>
+
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-4">
@@ -136,7 +146,7 @@ export function StockAvailabilityModule() {
               <TabsTrigger value="low-stock">Low Stock ({stockSummary.lowStock})</TabsTrigger>
               <TabsTrigger value="unavailable">Out of Stock ({stockSummary.unavailable})</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value={activeTab} className="mt-4">
               <Table>
                 <TableHeader>
@@ -168,7 +178,7 @@ export function StockAvailabilityModule() {
                   ))}
                 </TableBody>
               </Table>
-              
+
               {filteredStock.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   No items found matching your criteria.

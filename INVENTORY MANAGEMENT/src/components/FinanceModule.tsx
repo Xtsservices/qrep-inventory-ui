@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -11,85 +11,57 @@ import { Badge } from './ui/badge';
 import { Plus, TrendingUp, TrendingDown, DollarSign, CreditCard, IndianRupee } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { toast } from 'sonner';
+import axios from 'axios';
 
-const initialTransactions = [
-  {
-    id: 'TXN001',
-    date: '2024-01-15',
-    vendor: 'Fresh Foods Suppliers',
-    items: ['Basmati Rice', 'Toor Dal'],
-    amount: 1500,
-    status: 'Paid',
-    notes: 'Monthly stock purchase'
-  },
-  {
-    id: 'TXN002',
-    date: '2024-01-14',
-    vendor: 'Grain Masters',
-    items: ['Refined Oil'],
-    amount: 2500,
-    status: 'Pending',
-    notes: 'Bulk oil purchase'
-  },
-  {
-    id: 'TXN003',
-    date: '2024-01-13',
-    vendor: 'Spice World',
-    items: ['Turmeric Powder', 'Cumin Seeds'],
-    amount: 800,
-    status: 'Paid',
-    notes: 'Spice restocking'
-  }
-];
-
-const vendors = ['Fresh Foods Suppliers', 'Grain Masters', 'Spice World'];
-const availableItems = [
-  'Basmati Rice', 'Toor Dal', 'Refined Oil', 'Onions', 'Turmeric Powder',
-  'Wheat Flour', 'Sugar', 'Salt', 'Cumin Seeds', 'Coriander Seeds'
-];
-
-// Mock data for charts
-const monthlyData = [
-  { month: 'Jan', purchases: 15000, consumption: 12000 },
-  { month: 'Feb', purchases: 18000, consumption: 14000 },
-  { month: 'Mar', purchases: 22000, consumption: 16000 },
-  { month: 'Apr', purchases: 19000, consumption: 15000 },
-  { month: 'May', purchases: 25000, consumption: 18000 },
-  { month: 'Jun', purchases: 21000, consumption: 17000 },
-];
-
-const vendorExpenseData = [
-  { vendor: 'Fresh Foods', amount: 45000, color: '#8884d8' },
-  { vendor: 'Grain Masters', amount: 35000, color: '#82ca9d' },
-  { vendor: 'Spice World', amount: 25000, color: '#ffc658' },
-  { vendor: 'Others', amount: 15000, color: '#ff7c7c' }
-];
 
 export function FinanceModule() {
-  const [transactions, setTransactions] = useState(initialTransactions);
+  const [transactions, setTransactions] = useState([]);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [transactionFormData, setTransactionFormData] = useState({
-    vendor: '',
+    vendor_id: '',
     items: [],
     quantity: '',
     amount: '',
     status: 'Pending',
     notes: ''
   });
+ 
 
-  const generateTransactionId = () => {
-    const lastId = transactions.length > 0 ? 
-      Math.max(...transactions.map(txn => parseInt(txn.id.replace('TXN', '')))) : 0;
-    return `TXN${String(lastId + 1).padStart(3, '0')}`;
+  // Fetch transactions from API
+  const fetchTransactions = async () => {
+    try {
+      const res = await axios.get('http://172.16.4.40:9000/api/billings'); // replace with your API URL
+      if (res.data.success) {
+        const formattedTransactions = res.data.data.map(txn => ({
+          id: `TXN${txn.billing_id}`,
+          date: txn.date,
+          vendor_name: txn.vendor_name,
+          items: [txn.item_name], // assuming one item per billing
+          amount: txn.total,
+          status: txn.status,
+          notes: txn.notes
+        }));
+        setTransactions(formattedTransactions);
+      }
+    } catch (err) {
+      console.error('Error fetching transactions:', err);
+      toast.error('Failed to load transactions');
+    }
   };
 
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
+
+  // Calculate summary
   const calculateFinancialSummary = () => {
-    const totalPurchases = transactions.reduce((sum, txn) => sum + txn.amount, 0);
-    const totalConsumption = totalPurchases * 0.85; // Mock consumption as 85% of purchases
-    const outstandingPayments = transactions
-      .filter(txn => txn.status === 'Pending')
-      .reduce((sum, txn) => sum + txn.amount, 0);
-    
+const totalPurchases = transactions.reduce((sum, txn) => sum + Number(txn.amount || 0), 0);
+const totalConsumption = totalPurchases * 0.85;
+const outstandingPayments = transactions
+  .filter(txn => txn.status === 'Pending')
+  .reduce((sum, txn) => sum + Number(txn.amount || 0), 0);
+
+
     return {
       totalPurchases,
       totalConsumption,
@@ -99,58 +71,24 @@ export function FinanceModule() {
     };
   };
 
-  const handleAddTransaction = () => {
-    if (!transactionFormData.vendor) {
-      toast.error('Please select a vendor');
-      return;
-    }
-    if (transactionFormData.items.length === 0) {
-      toast.error('Please select at least one item');
-      return;
-    }
-    if (!transactionFormData.amount || parseFloat(transactionFormData.amount) <= 0) {
-      toast.error('Please enter a valid amount');
-      return;
-    }
+  // Aggregate vendor expenses dynamically
+// 1. Aggregate vendor expenses dynamically (only real API data)
+const vendorExpenseData = transactions.reduce((acc: any[], txn: any) => {
+  const vendorName = txn.vendor_name || "Unknown Vendor";
+  const existing = acc.find((v) => v.vendor === vendorName);
 
-    const newTransaction = {
-      id: generateTransactionId(),
-      date: new Date().toISOString().split('T')[0],
-      vendor: transactionFormData.vendor,
-      items: transactionFormData.items,
-      amount: parseFloat(transactionFormData.amount),
-      status: transactionFormData.status,
-      notes: transactionFormData.notes,
-      quantity: transactionFormData.quantity
-    };
-
-    setTransactions([...transactions, newTransaction]);
-    toast.success('Transaction added successfully!');
-    
-    setTransactionFormData({
-      vendor: '',
-      items: [],
-      quantity: '',
-      amount: '',
-      status: 'Pending',
-      notes: ''
+  if (existing) {
+    existing.amount += Number(txn.amount);
+  } else {
+    acc.push({
+      vendor: vendorName,
+      amount: Number(txn.amount),
+      color: ["#8884d8", "#82ca9d", "#ffc658", "#ff7c7c", "#00C49F", "#FFBB28"][acc.length % 6], // cycle colors
     });
-    setShowAddDialog(false);
-  };
+  }
+  return acc;
+}, []);
 
-  const handleItemToggle = (item, checked) => {
-    if (checked) {
-      setTransactionFormData({
-        ...transactionFormData,
-        items: [...transactionFormData.items, item]
-      });
-    } else {
-      setTransactionFormData({
-        ...transactionFormData,
-        items: transactionFormData.items.filter(i => i !== item)
-      });
-    }
-  };
 
   const summary = calculateFinancialSummary();
 
@@ -218,6 +156,7 @@ export function FinanceModule() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Monthly Purchase vs Consumption */}
         <Card>
           <CardHeader>
             <CardTitle>Monthly Purchase vs Consumption</CardTitle>
@@ -225,44 +164,57 @@ export function FinanceModule() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={monthlyData}>
+              <BarChart data={transactions}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
+                <XAxis dataKey="date" />
                 <YAxis />
                 <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
-                <Bar dataKey="purchases" fill="#8884d8" name="Purchases" />
-                <Bar dataKey="consumption" fill="#82ca9d" name="Consumption" />
+                <Bar dataKey="amount" fill="#8884d8" name="Purchases" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Vendor-wise Expense Distribution</CardTitle>
-            <CardDescription>Distribution of expenses across different vendors</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={vendorExpenseData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="amount"
-                  label={({ vendor, percent }) => `${vendor} ${(percent * 100).toFixed(0)}%`}
-                >
-                  {vendorExpenseData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Vendor-wise Expense Distribution */}
+        {/* Vendor-wise Expense Distribution */}
+<Card>
+  <CardHeader>
+    <CardTitle>Vendor-wise Expense Distribution</CardTitle>
+    <CardDescription>Distribution of expenses across different vendors</CardDescription>
+  </CardHeader>
+  <CardContent>
+  {vendorExpenseData.length > 0 ? (
+  <ResponsiveContainer width="100%" height={300}>
+    <PieChart>
+      <Pie
+        data={vendorExpenseData}
+        dataKey="amount"
+        nameKey="vendor"
+        cx="50%"
+        cy="50%"
+        outerRadius={80}
+        label={({ vendor, percent }) =>
+          `${vendor} ${(percent * 100).toFixed(0)}%`
+        }
+        isAnimationActive={true}
+        animationBegin={0}
+        animationDuration={1200}
+        animationEasing="ease-out"
+      >
+        {vendorExpenseData.map((entry, index) => (
+          <Cell key={`cell-${index}`} fill={entry.color} />
+        ))}
+      </Pie>
+      <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
+    </PieChart>
+  </ResponsiveContainer>
+) : (
+  <p className="text-center text-muted-foreground">No vendor data available</p>
+)}
+
+  </CardContent>
+</Card>
+
       </div>
 
       {/* Transactions Table */}
@@ -297,19 +249,14 @@ export function FinanceModule() {
                   <TableRow key={transaction.id}>
                     <TableCell className="font-mono">{transaction.id}</TableCell>
                     <TableCell>{new Date(transaction.date).toLocaleDateString()}</TableCell>
-                    <TableCell>{transaction.vendor}</TableCell>
+                    <TableCell>{transaction.vendor_name}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {transaction.items.slice(0, 2).map((item, index) => (
+                        {transaction.items.map((item, index) => (
                           <Badge key={index} variant="secondary" className="text-xs">
                             {item}
                           </Badge>
                         ))}
-                        {transaction.items.length > 2 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{transaction.items.length - 2} more
-                          </Badge>
-                        )}
                       </div>
                     </TableCell>
                     <TableCell>₹{transaction.amount.toLocaleString()}</TableCell>
