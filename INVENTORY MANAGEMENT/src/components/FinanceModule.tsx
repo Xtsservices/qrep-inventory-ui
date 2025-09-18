@@ -72,7 +72,7 @@ const outstandingPayments = transactions
   };
 
   // Aggregate vendor expenses dynamically
-// 1. Aggregate vendor expenses dynamically (only real API data)
+
 const vendorExpenseData = transactions.reduce((acc: any[], txn: any) => {
   const vendorName = txn.vendor_name || "Unknown Vendor";
   const existing = acc.find((v) => v.vendor === vendorName);
@@ -229,12 +229,13 @@ const vendorExpenseData = transactions.reduce((acc: any[], txn: any) => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Transaction ID</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Vendor</TableHead>
-                <TableHead>Item(s)</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead className="text-center">Transaction ID</TableHead>
+<TableHead className="text-center">Date</TableHead>
+<TableHead className="text-center">Vendor</TableHead>
+<TableHead className="text-center">Item(s)</TableHead>
+<TableHead className="text-center">Amount</TableHead>
+<TableHead className="text-center">Status</TableHead>
+
               </TableRow>
             </TableHeader>
             <TableBody>

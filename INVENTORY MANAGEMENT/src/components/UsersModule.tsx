@@ -31,6 +31,12 @@ export function UsersModule() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [viewingUser, setViewingUser] = useState<any>(null);
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [errors, setErrors] = useState({
+  name: '',
+  mobileNumber: '',
+  email: '',
+  role: ''
+});
 
   const [userFormData, setUserFormData] = useState({
     name: '', mobileNumber: '', email: '', role: '', status: 'Active'
@@ -54,26 +60,71 @@ export function UsersModule() {
     }
   };
 
-  const validateForm = (data: any) => {
-    const { name, mobileNumber, email, role } = data;
+const validateForm = (data: any) => {
+  let valid = true;
+  let newErrors = { name: '', mobileNumber: '', email: '', role: '' };
 
-    if (!name.trim()) { toast.error('Please enter user name'); return false; }
-    if (!/^[A-Za-z\s]{2,50}$/.test(name.trim())) { toast.error('Name should contain only letters and spaces'); return false; }
-    if (!mobileNumber.trim()) { toast.error('Please enter mobile number'); return false; }
-    if (!/^\d{10}$/.test(mobileNumber)) { toast.error('Please enter a valid 10-digit mobile number'); return false; }
-    if (!email.trim()) { toast.error('Please enter email address'); return false; }
-    if (!/\S+@\S+\.\S+/.test(email)) { toast.error('Please enter a valid email address'); return false; }
-    if (!role) { toast.error('Please select a role'); return false; }
+  // Name validation
+  if (!data.name.trim()) {
+    newErrors.name = 'Please enter user name';
+    toast.error(newErrors.name);   // show toast
+    valid = false;
+  } else if (!/^[A-Za-z\s]{2,50}$/.test(data.name.trim())) {
+    newErrors.name = 'Name should contain only letters and spaces';
+    toast.error(newErrors.name);
+    valid = false;
+  }
 
-    // Duplicate check
-    const isDuplicateNumber = users.some(u => u.mobileNumber === mobileNumber && u.id !== data.id);
-    const isDuplicateEmail = users.some(u => u.email === email && u.id !== data.id);
+  // Mobile Number
+  if (!data.mobileNumber.trim()) {
+    newErrors.mobileNumber = 'Please enter mobile number';
+    toast.error(newErrors.mobileNumber);
+    valid = false;
+  } else if (!/^\d{10}$/.test(data.mobileNumber)) {
+    newErrors.mobileNumber = 'Please enter a valid 10-digit mobile number';
+    toast.error(newErrors.mobileNumber);
+    valid = false;
+  }
 
-    if (isDuplicateNumber) { toast.error('Mobile number already exists'); return false; }
-    if (isDuplicateEmail) { toast.error('Email address already exists'); return false; }
+  // Email
+  if (!data.email.trim()) {
+    newErrors.email = 'Please enter email address';
+    toast.error(newErrors.email);
+    valid = false;
+  } else if (!/\S+@\S+\.\S+/.test(data.email)) {
+    newErrors.email = 'Please enter a valid email address';
+    toast.error(newErrors.email);
+    valid = false;
+  }
 
-    return true;
-  };
+  // Role
+  if (!data.role) {
+    newErrors.role = 'Please select a role';
+    toast.error(newErrors.role);
+    valid = false;
+  }
+
+  // Duplicate check
+  const isDuplicateNumber = users.some(u => u.mobileNumber === data.mobileNumber && u.id !== data.id);
+  const isDuplicateEmail = users.some(u => u.email === data.email && u.id !== data.id);
+
+  if (isDuplicateNumber) {
+    newErrors.mobileNumber = 'Mobile number already exists';
+    toast.error(newErrors.mobileNumber);  // toast for duplicate
+    valid = false;
+  }
+
+  if (isDuplicateEmail) {
+    newErrors.email = 'Email address already exists';
+    toast.error(newErrors.email);         // toast for duplicate
+    valid = false;
+  }
+
+  setErrors(newErrors);
+  return valid;
+};
+
+
 
   const resetForm = () => setUserFormData({ name: '', mobileNumber: '', email: '', role: '', status: 'Active' });
 
@@ -174,7 +225,7 @@ export function UsersModule() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>User ID</TableHead>
+                <TableHead>S. No.</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Mobile Number</TableHead>
@@ -191,10 +242,10 @@ export function UsersModule() {
                   </TableCell>
                 </TableRow>
               ) : (
-                users.map(user => (
+                users.map((user,index) => (
                   <TableRow key={user.id}>
-                    <TableCell>{user.id}</TableCell>
-                    <TableCell>{user.name}</TableCell>
+                    <TableCell>{index + 1}</TableCell>
+                    <TableCell>{user.name}</TableCell>  
                     <TableCell><Badge variant={getRoleBadgeVariant(user.role)}>{user.role}</Badge></TableCell>
                     <TableCell>{user.mobileNumber}</TableCell>
                     <TableCell>{user.email}</TableCell>
@@ -234,47 +285,108 @@ export function UsersModule() {
       </Card>
 
       {/* Add User Dialog */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New User</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Name</Label>
-              <Input
-                value={userFormData.name}
-                onChange={e => setUserFormData({ ...userFormData, name: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>Mobile Number</Label>
-              <Input
-                value={userFormData.mobileNumber}
-                onChange={e => setUserFormData({ ...userFormData, mobileNumber: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>Email</Label>
-              <Input
-                value={userFormData.email}
-                onChange={e => setUserFormData({ ...userFormData, email: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>Role</Label>
-              <Select value={userFormData.role} onValueChange={value => setUserFormData({ ...userFormData, role: value })}>
-                <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
-                <SelectContent>{roles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button onClick={handleAddUser}>Add User</Button>
-              <Button variant="ghost" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Add User Dialog */}
+<Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Add New User</DialogTitle>
+    </DialogHeader>
+
+    <div className="space-y-4">
+      {/* Name */}
+      <div>
+        <Label>Name</Label>
+        <div className="relative">
+          <Input
+            value={userFormData.name}
+            onChange={e => setUserFormData({ ...userFormData, name: e.target.value })}
+            className={errors.name ? 'border-red-500 pr-8' : ''}
+          />
+          {errors.name && (
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-red-500">&#9888;</span>
+          )}
+        </div>
+        {errors.name && <p className="text-red-600 text-sm mt-1">{errors.name}</p>}
+      </div>
+
+      {/* Mobile Number */}
+      <div>
+         <Label>Mobile Number</Label>
+  <div className="relative">
+    <Input
+      type="tel" // ensures numeric keypad on mobile and restricts letters
+      inputMode="numeric" // better numeric support
+      pattern="[0-9]*" // allow only digits
+      maxLength={10} // limit to 10 digits
+      value={userFormData.mobileNumber}
+      onChange={e => {
+        // allow only numbers
+        const onlyNumbers = e.target.value.replace(/\D/g, '');
+        setUserFormData({ ...userFormData, mobileNumber: onlyNumbers });
+      }}
+      className={errors.mobileNumber ? 'border-red-500 pr-8' : ''}
+    />
+    {errors.mobileNumber && (
+      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-red-600">&#9888;</span>
+    )}
+  </div>
+  {errors.mobileNumber && (
+    <p className="text-red-600">
+      Please enter a valid 10-digit mobile number
+    </p>
+  )}
+      </div>
+
+      {/* Email */}
+      <div>
+        <Label>Email</Label>
+        <div className="relative">
+          <Input
+            value={userFormData.email}
+            onChange={e => setUserFormData({ ...userFormData, email: e.target.value })}
+            className={errors.email ? 'border-red-600 pr-8' : ''}
+          />
+          {errors.email && (
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-red-600">&#9888;</span>
+          )}
+        </div>
+        {errors.email && <p className="text-red-600 text-sm mt-1">{errors.email}</p>}
+      </div>
+
+      {/* Role */}
+      <div>
+        <Label>Role</Label>
+        <div className="relative">
+          <Select
+            value={userFormData.role}
+            onValueChange={value => setUserFormData({ ...userFormData, role: value })}
+            className={errors.role ? 'border-red-600 pr-8' : ''}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select role" />
+            </SelectTrigger>
+            <SelectContent>
+              {roles.map(r => (
+                <SelectItem key={r} value={r}>{r}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.role && (
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-red-600">&#9888;</span>
+          )}
+        </div>
+        {errors.role && <p className="text-red-600 text-sm mt-1">{errors.role}</p>}
+      </div>
+
+      {/* Buttons */}
+      <div className="flex justify-end gap-2">
+        <Button onClick={handleAddUser}>Add User</Button>
+        <Button variant="ghost" onClick={() => setShowAddDialog(false)}>Cancel</Button>
+      </div>
+    </div>
+  </DialogContent>
+</Dialog>
+
 
       {/* View User Dialog */}
       <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
@@ -373,6 +485,8 @@ export function UsersModule() {
           </div>
         </DialogContent>
       </Dialog>
+    
+
     </div>
   );
 }

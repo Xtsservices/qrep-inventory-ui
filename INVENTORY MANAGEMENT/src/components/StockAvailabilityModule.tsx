@@ -11,34 +11,37 @@ export function StockAvailabilityModule() {
   const [stock, setStock] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all');
-
+    
+  const API_URL = "http://172.16.4.40:9000/api";
   // Fetch stock data from API
-  useEffect(() => {
-    axios.get('http://172.16.4.40:9000/api/stocks')
-      .then(res => {
-        console.log("Raw stock from API:", res.data.data);
-        if (res.data.success) {
-          const transformed = res.data.data.map(item => ({
-  id: item.stock_id,
-  itemName: item.item_name,
-  quantity: item.quantity !== null && item.quantity !== undefined
-    ? parseFloat(item.quantity)
-    : 0, // fallback to 0
-  unit: item.unit || '-', 
-  minThreshold: item.min_threshold !== null && item.min_threshold !== undefined
-    ? parseFloat(item.min_threshold)
-    : 0,
-  status:
-    (parseFloat(item.quantity) || 0) === 0 ? 'Unavailable' :
-    (parseFloat(item.quantity) || 0) <= (parseFloat(item.min_threshold) || 0) ? 'Low Stock' :
-    'Available'
-}));
+useEffect(() => {
+  axios.get(`${API_URL}/stocks`)
+    .then(res => {
+      if (res.data.success) {
+        const transformed = res.data.data.map(item => {
+          const quantity = item.quantity != null && !isNaN(item.quantity) ? Number(item.quantity) : 0;
+          const minThreshold = item.min_threshold != null && !isNaN(item.min_threshold) ? Number(item.min_threshold) : 0;
 
-          setStock(transformed);
-        }
-      })
-      .catch(err => console.error('Error fetching stock:', err));
-  }, []);
+          let status = 'Unavailable';
+          if (quantity > 0 && quantity > minThreshold) status = 'Available';
+          else if (quantity > 0 && quantity <= minThreshold) status = 'Low Stock';
+
+          return {
+            id: item.stock_id,
+            itemName: item.item_name,
+            quantity,
+            unit: item.unit || '-',
+            minThreshold,
+            status
+          };
+        });
+
+        setStock(transformed);
+      }
+    })
+    .catch(err => console.error('Error fetching stock:', err));
+}, []);
+
 
   // Badge variant based on status
   const getStatusVariant = (status) => {
