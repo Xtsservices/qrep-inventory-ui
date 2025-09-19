@@ -3,20 +3,77 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from './ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from './ui/table';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from './ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogDescription
+} from './ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from './ui/select';
 import { Badge } from './ui/badge';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Plus, Edit, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-const API_VENDORS = 'http://172.16.4.220:9000/api/vendors';
-const API_ORDERS = 'http://172.16.4.220:9000/api/orders';
+const API_VENDORS = 'http://172.16.4.56:9000/api/vendors';
+const API_ITEMS = 'http://172.16.4.56:9000/api/items';
+const API_ORDERS = 'http://172.16.4.56:9000/api/orders';
+
+interface Vendor {
+  id: string;
+  name: string;
+}
+
+interface Item {
+  id: string;
+  name: string;
+}
+
+interface BulkItem {
+  itemId: string;
+  quantity: string;
+}
+
+interface OrderFormData {
+  orderType: 'single' | 'bulk';
+  vendorId: string;
+  singleItemId: string;
+  bulkItems: BulkItem[];
+  quantity: string;
+  notes: string;
+}
+
+interface EditItemData {
+  item: string;
+  price: string;
+}
 
 export function OrdersModule() {
-  const [vendors, setVendors] = useState<any[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [availableItems, setAvailableItems] = useState<Item[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [showPlaceOrderDialog, setShowPlaceOrderDialog] = useState(false);
   const [showEditOrderDialog, setShowEditOrderDialog] = useState(false);
@@ -24,36 +81,73 @@ export function OrdersModule() {
   const [editingOrder, setEditingOrder] = useState<any>(null);
   const [viewingOrder, setViewingOrder] = useState<any>(null);
 
-  const [orderFormData, setOrderFormData] = useState({
+  const [orderFormData, setOrderFormData] = useState<OrderFormData>({
     orderType: 'single',
-    vendor: '',
-    singleItem: '',
-    bulkItems: [{ name: '', quantity: '' }],
+    vendorId: '',
+    singleItemId: '',
+    bulkItems: [{ itemId: '', quantity: '' }],
     quantity: '',
     notes: ''
   });
 
-  const [editFormData, setEditFormData] = useState({
-    itemPrices: []
-  });
-
-  const [availableItems, setAvailableItems] = useState<string[]>([]);
+  const [editFormData, setEditFormData] = useState<EditItemData[]>([]);
 
   // Fetch vendors
   useEffect(() => {
     fetch(API_VENDORS)
       .then(res => res.json())
-      .then(data => setVendors(data.data || []))
+      .then(data => {
+        const arr = data.data || [];
+        const vendorObjs = arr
+          .filter((v: any) => v.vendor_id != null)
+          .map((v: any) => ({
+            id: String(v.vendor_id),
+            name: v.vendor_name || 'Unnamed'
+          }));
+        setVendors(vendorObjs);
+      })
       .catch(err => console.error('Vendor fetch error', err));
   }, []);
 
-  // Fetch orders
-  const fetchOrders = () => {
-    fetch(API_ORDERS)
+  // Fetch items
+  useEffect(() => {
+    fetch(API_ITEMS)
       .then(res => res.json())
-      .then(data => setOrders(data.data || []))
-      .catch(err => console.error('Orders fetch error', err));
-  };
+      .then(data => {
+        const arr = data.data || [];
+        const itemObjs = arr
+          .filter((i: any) => i.item_id || i.id)
+          .map((i: any) => ({
+            id: String(i.item_id || i.id),
+            name: i.name || i.item_name || 'Unnamed'
+          }));
+        setAvailableItems(itemObjs);
+      })
+      .catch(err => console.error('Items fetch error', err));
+  }, []);
+
+// Fetch orders
+const fetchOrders = () => {
+  fetch(API_ORDERS)
+    .then(res => res.json())
+    .then(data => {
+      // If API returns array, use it directly; if single object, wrap in array
+      const arr = Array.isArray(data) ? data : (data.data || [data]);
+
+      const mapped = arr.map((o: any) => ({
+        id: o.order_id,
+        vendorName: o.vendor_name,
+        date: o.date,
+        items: o.items,
+        status: o.status,
+        totalAmount: o.total, // your table shows totalAmount
+        notes: o.notes || ''
+      }));
+
+      setOrders(mapped);
+    })
+    .catch(err => console.error('Orders fetch error', err));
+};
 
   useEffect(() => {
     fetchOrders();
@@ -61,51 +155,109 @@ export function OrdersModule() {
 
   // Place order
   const handlePlaceOrder = async () => {
-    if (!orderFormData.vendor) return toast.error('Select vendor');
+    if (!orderFormData.vendorId) return toast.error('Select vendor');
 
     let items: any[] = [];
+
     if (orderFormData.orderType === 'single') {
-      if (!orderFormData.singleItem) return toast.error('Select item');
-      items = [{ name: orderFormData.singleItem, quantity: orderFormData.quantity }];
+      const selectedItem = availableItems.find(i => i.id === orderFormData.singleItemId);
+      if (!selectedItem) return toast.error('Select an item');
+
+      items = [
+        {
+          item: selectedItem?.name || 'Unnamed',
+          quantity: Number(orderFormData.quantity),
+          price: 0
+        }
+      ];
     } else {
-      const validBulkItems = orderFormData.bulkItems.filter(i => i.name && i.quantity);
-      if (validBulkItems.length === 0) return toast.error('Add at least one item with quantity');
-      items = validBulkItems;
+      const validBulkItems = orderFormData.bulkItems.filter(i => i.itemId && i.quantity);
+      if (!validBulkItems.length) return toast.error('Add at least one bulk item');
+
+      items = validBulkItems.map(i => {
+        const selectedItem = availableItems.find(ai => ai.id === i.itemId);
+        return {
+          item: selectedItem?.name || 'Unnamed',
+          quantity: Number(i.quantity),
+          price: 0
+        };
+      });
     }
 
+    const selectedVendor = vendors.find(v => v.id === orderFormData.vendorId);
+    if (!selectedVendor) return toast.error('Vendor not found');
+
+    const total = items.reduce((sum, i) => sum + (i.quantity || 0), 0);
+
+    const order_id = `ORD${Date.now()}`;
+
     try {
+      const orderPayload = {
+         order_id,
+        vendor_name: selectedVendor.name,
+        date: new Date(),
+        items,
+        status: 'Pending',
+        total,
+        notes: orderFormData.notes
+      };
+
       const res = await fetch(API_ORDERS, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vendor: orderFormData.vendor, items, notes: orderFormData.notes })
+        body: JSON.stringify(orderPayload)
       });
-      if (!res.ok) throw new Error('Failed to place order');
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to place order');
+
       toast.success('Order placed successfully!');
       setShowPlaceOrderDialog(false);
-      setOrderFormData({ orderType: 'single', vendor: '', singleItem: '', bulkItems: [{ name: '', quantity: '' }], quantity: '', notes: '' });
+      setOrderFormData({
+        orderType: 'single',
+        vendorId: '',
+        singleItemId: '',
+        bulkItems: [{ itemId: '', quantity: '' }],
+        quantity: '',
+        notes: ''
+      });
       fetchOrders();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error('Failed to place order');
+      toast.error(err.message || 'Failed to place order');
     }
   };
 
   // Edit order
   const handleEditOrder = (order: any) => {
     setEditingOrder(order);
-    setEditFormData({ itemPrices: order.items.map((item: any) => ({ item, price: item.price || '' })) });
+    setEditFormData(order.items.map((item: any) => ({ item: item.item || item.name, price: item.price || '' })));
     setShowEditOrderDialog(true);
   };
 
   const handleUpdateOrder = async () => {
-    const totalAmount = editFormData.itemPrices.reduce((sum, item) => sum + (parseFloat(item.price) || 0), 0);
-    const updatedOrder = { ...editingOrder, items: editFormData.itemPrices, totalAmount, status: 'Completed' };
+    if (!editingOrder) return;
+
+    const totalAmount = editFormData.reduce((sum, item) => sum + (parseFloat(item.price) || 0), 0);
+    const updatedItems = editFormData.map(i => ({
+      item: i.item,
+      price: i.price,
+      quantity: editingOrder.items.find((x: any) => (x.item || x.name) === i.item)?.quantity || 0
+    }));
+
+    const payload = {
+      vendor_name: editingOrder.vendorName,
+      items: updatedItems,
+      status: 'Completed',
+      total: totalAmount,
+      date: new Date()
+    };
 
     try {
       const res = await fetch(`${API_ORDERS}/${editingOrder.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedOrder)
+        body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error('Failed to update order');
       toast.success('Order updated!');
@@ -124,23 +276,32 @@ export function OrdersModule() {
     setShowViewOrderDialog(true);
   };
 
-  // Bulk item handlers
-  const addBulkItem = () => setOrderFormData({ ...orderFormData, bulkItems: [...orderFormData.bulkItems, { name: '', quantity: '' }] });
-  const removeBulkItem = (index: number) => setOrderFormData({ ...orderFormData, bulkItems: orderFormData.bulkItems.filter((_, i) => i !== index) });
+  const addBulkItem = () =>
+    setOrderFormData({
+      ...orderFormData,
+      bulkItems: [...orderFormData.bulkItems, { itemId: '', quantity: '' }]
+    });
+
+  const removeBulkItem = (index: number) =>
+    setOrderFormData({ ...orderFormData, bulkItems: orderFormData.bulkItems.filter((_, i) => i !== index) });
+
   const updateBulkItem = (index: number, field: string, value: string) => {
     const newBulk = [...orderFormData.bulkItems];
-    newBulk[index][field] = value;
+    (newBulk[index] as any)[field] = value;
     setOrderFormData({ ...orderFormData, bulkItems: newBulk });
   };
 
   return (
     <div className="space-y-6">
-      {/* Header & Place Order */}
+      {/* Header & Place Order Dialog */}
       <div className="flex justify-between items-center">
         <p className="text-muted-foreground">Manage vendor orders</p>
         <Dialog open={showPlaceOrderDialog} onOpenChange={setShowPlaceOrderDialog}>
           <DialogTrigger asChild>
-            <Button><Plus className="w-4 h-4 mr-2" />Place Order</Button>
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Place Order
+            </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -151,18 +312,34 @@ export function OrdersModule() {
               {/* Order Type */}
               <div className="space-y-3">
                 <Label>Order Type</Label>
-                <RadioGroup value={orderFormData.orderType} onValueChange={(val) => setOrderFormData({ ...orderFormData, orderType: val })}>
-                  <div className="flex items-center space-x-2"><RadioGroupItem value="single" id="single" /><Label htmlFor="single">Single Item</Label></div>
-                  <div className="flex items-center space-x-2"><RadioGroupItem value="bulk" id="bulk" /><Label htmlFor="bulk">Bulk Items</Label></div>
+                <RadioGroup value={orderFormData.orderType} onValueChange={val => setOrderFormData({ ...orderFormData, orderType: val as any })}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="single" id="single" />
+                    <Label htmlFor="single">Single Item</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="bulk" id="bulk" />
+                    <Label htmlFor="bulk">Bulk Items</Label>
+                  </div>
                 </RadioGroup>
               </div>
 
               {/* Vendor */}
               <div className="space-y-2">
                 <Label>Vendor *</Label>
-                <Select value={orderFormData.vendor} onValueChange={(val) => setOrderFormData({ ...orderFormData, vendor: val })}>
-                  <SelectTrigger><SelectValue placeholder="Select vendor" /></SelectTrigger>
-                  <SelectContent>{vendors.map(v => <SelectItem key={v.id} value={v.vendorName || v.name}>{v.vendorName || v.name}</SelectItem>)}</SelectContent>
+                <Select value={orderFormData.vendorId} onValueChange={val => setOrderFormData({ ...orderFormData, vendorId: val })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select vendor">
+                      {vendors.find(v => v.id === orderFormData.vendorId)?.name || 'Select vendor'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vendors.map(v => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
 
@@ -170,27 +347,51 @@ export function OrdersModule() {
               {orderFormData.orderType === 'single' ? (
                 <div className="space-y-2">
                   <Label>Select Item *</Label>
-                  <Select value={orderFormData.singleItem} onValueChange={(val) => setOrderFormData({ ...orderFormData, singleItem: val })}>
-                    <SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger>
-                    <SelectContent>{availableItems.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                  <Select value={orderFormData.singleItemId} onValueChange={val => setOrderFormData({ ...orderFormData, singleItemId: val })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select item" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableItems.map(item => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
                   <Label>Quantity</Label>
-                  <Input type="number" value={orderFormData.quantity} onChange={(e) => setOrderFormData({ ...orderFormData, quantity: e.target.value })} />
+                  <Input type="text" value={orderFormData.quantity} onChange={e => setOrderFormData({ ...orderFormData, quantity: e.target.value })} />
                 </div>
               ) : (
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <Label>Items with Quantities *</Label>
-                    <Button size="sm" variant="outline" onClick={addBulkItem}><Plus className="w-3 h-3 mr-1" />Add Item</Button>
+                    <Button size="sm" variant="outline" onClick={addBulkItem}>
+                      <Plus className="w-3 h-3 mr-1" />
+                      Add Item
+                    </Button>
                   </div>
                   {orderFormData.bulkItems.map((item, idx) => (
                     <div key={idx} className="flex gap-3 p-3 border rounded-lg">
-                      <Select value={item.name} onValueChange={(val) => updateBulkItem(idx, 'name', val)}>
-                        <SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger>
-                        <SelectContent>{availableItems.map(it => <SelectItem key={it} value={it}>{it}</SelectItem>)}</SelectContent>
+                      <Select value={item.itemId} onValueChange={val => updateBulkItem(idx, 'itemId', val)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select item" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableItems.map(i => (
+                            <SelectItem key={i.id} value={i.id}>
+                              {i.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
                       </Select>
-                      <Input placeholder="Quantity" value={item.quantity} onChange={(e) => updateBulkItem(idx, 'quantity', e.target.value)} />
-                      {orderFormData.bulkItems.length > 1 && <Button size="sm" variant="outline" className="text-red-600" onClick={() => removeBulkItem(idx)}><X className="w-3 h-3" /></Button>}
+
+                      <Input placeholder="Quantity" value={item.quantity} onChange={e => updateBulkItem(idx, 'quantity', e.target.value)} />
+                      {orderFormData.bulkItems.length > 1 && (
+                        <Button size="sm" variant="outline" className="text-red-600" onClick={() => removeBulkItem(idx)}>
+                          <X className="w-3 h-3" />
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -199,11 +400,13 @@ export function OrdersModule() {
               {/* Notes */}
               <div className="space-y-2">
                 <Label>Notes</Label>
-                <Textarea value={orderFormData.notes} onChange={(e) => setOrderFormData({ ...orderFormData, notes: e.target.value })} />
+                <Textarea value={orderFormData.notes} onChange={e => setOrderFormData({ ...orderFormData, notes: e.target.value })} />
               </div>
 
               <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setShowPlaceOrderDialog(false)}>Cancel</Button>
+                <Button variant="outline" onClick={() => setShowPlaceOrderDialog(false)}>
+                  Cancel
+                </Button>
                 <Button onClick={handlePlaceOrder}>Place Order</Button>
               </div>
             </div>
@@ -235,13 +438,29 @@ export function OrdersModule() {
                 <TableRow key={order.id}>
                   <TableCell>{order.id}</TableCell>
                   <TableCell>{order.vendorName}</TableCell>
-                  <TableCell>{new Date(order.date).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                     {(() => {
+                     const d = new Date(order.date);
+                     return d.toLocaleDateString('en-GB', {
+                     day: '2-digit',
+                     month: 'short',
+                     year: 'numeric'
+                     }).replace(/ /g, '-'); // Example: 19-Sep-2025
+                     })()}
+                   </TableCell>
+
                   <TableCell>{order.items?.length}</TableCell>
-                  <TableCell><Badge variant={order.status === 'Completed' ? 'default' : 'secondary'}>{order.status}</Badge></TableCell>
-                  <TableCell>{order.totalAmount ? `₹${order.totalAmount}` : '-'}</TableCell>
+                  <TableCell>
+                    <Badge variant={order.status === 'Completed' ? 'default' : 'secondary'}>{order.status}</Badge>
+                  </TableCell>
+                  <TableCell>{order.totalAmount ? '₹' + order.totalAmount : '-'}</TableCell>
                   <TableCell className="flex gap-2">
-                    <Button size="sm" variant="ghost" onClick={() => handleViewOrder(order)}><Eye className="w-4 h-4" /></Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleEditOrder(order)} disabled={order.status === 'Completed'}><Edit className="w-4 h-4" /></Button>
+                    <Button size="sm" variant="ghost" onClick={() => handleViewOrder(order)}>
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => handleEditOrder(order)} disabled={order.status === 'Completed'}>
+                      <Edit className="w-4 h-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -259,9 +478,17 @@ export function OrdersModule() {
           </DialogHeader>
           {viewingOrder && (
             <div className="space-y-4">
-              <div className="text-sm text-muted-foreground">Order ID: {viewingOrder.id} | Vendor: {viewingOrder.vendorName} | Status: {viewingOrder.status}</div>
-              <div><p className="font-semibold">Date:</p><p>{new Date(viewingOrder.date).toLocaleString()}</p></div>
-              <div><p className="font-semibold">Notes:</p><p>{viewingOrder.notes || '-'}</p></div>
+              <div className="text-sm text-muted-foreground">
+                Order ID: {viewingOrder.id} | Vendor: {viewingOrder.vendorName} | Status: {viewingOrder.status}
+              </div>
+              <div>
+                <p className="font-semibold">Date:</p>
+                <p>{new Date(viewingOrder.date).toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="font-semibold">Notes:</p>
+                <p>{viewingOrder.notes || '-'}</p>
+              </div>
               <div>
                 <p className="font-semibold">Items:</p>
                 <Table>
@@ -273,19 +500,21 @@ export function OrdersModule() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {viewingOrder.items.map((item: any, idx: number) => (
+                    {viewingOrder.items?.map((item: any, idx: number) => (
                       <TableRow key={idx}>
-                        <TableCell>{item.name || item.item}</TableCell>
+                        <TableCell>{item.item || item.name || '-'}</TableCell>
                         <TableCell>{item.quantity || '-'}</TableCell>
-                        <TableCell>{item.price ? `₹${item.price}` : '-'}</TableCell>
+                        <TableCell>{item.price ? '₹' + item.price : '-'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
-              <div className="pt-2 font-semibold">Total Amount: {viewingOrder.totalAmount ? `₹${viewingOrder.totalAmount}` : '-'}</div>
+              <div className="pt-2 font-semibold">Total Amount: {viewingOrder.totalAmount ? '₹' + viewingOrder.totalAmount : '-'}</div>
               <div className="flex justify-end pt-4">
-                <Button variant="outline" onClick={() => setShowViewOrderDialog(false)}>Close</Button>
+                <Button variant="outline" onClick={() => setShowViewOrderDialog(false)}>
+                  Close
+                </Button>
               </div>
             </div>
           )}
@@ -294,36 +523,42 @@ export function OrdersModule() {
 
       {/* Edit Order Dialog */}
       <Dialog open={showEditOrderDialog} onOpenChange={setShowEditOrderDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit Order</DialogTitle>
-            <DialogDescription>Update order details and add item prices</DialogDescription>
+            <DialogDescription>Update the prices or complete the order</DialogDescription>
           </DialogHeader>
           {editingOrder && (
             <div className="space-y-4">
-              <div className="text-sm text-muted-foreground">
-                Order ID: {editingOrder.id} | Vendor: {editingOrder.vendorName}
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <Label className="text-sm text-muted-foreground">Vendor</Label>
+                <p>{editingOrder.vendorName}</p>
               </div>
+              <Label className="text-sm text-muted-foreground">Update Items</Label>
               <div className="space-y-3">
-                <Label>Enter Item Prices</Label>
-                {editFormData.itemPrices.map((itemPrice, index) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <Label className="min-w-[120px]">{itemPrice.item}</Label>
+                {editFormData.map((item, idx) => (
+                  <div key={idx} className="grid grid-cols-3 gap-3 items-center">
+                    <p className="font-mono">{item.item}</p>
                     <Input
+                      placeholder="Price"
                       type="number"
-                      placeholder="Enter price"
-                      value={itemPrice.price}
-                      onChange={(e) => {
-                        const newPrices = [...editFormData.itemPrices];
-                        newPrices[index].price = e.target.value;
-                        setEditFormData({ ...editFormData, itemPrices: newPrices });
+                      value={item.price}
+                      onChange={e => {
+                        const updated = [...editFormData];
+                        updated[idx].price = e.target.value;
+                        setEditFormData(updated);
                       }}
                     />
+                    <span className="text-sm text-muted-foreground">
+                      Qty: {editingOrder.items[idx].quantity}
+                    </span>
                   </div>
                 ))}
               </div>
               <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setShowEditOrderDialog(false)}>Cancel</Button>
+                <Button variant="outline" onClick={() => setShowEditOrderDialog(false)}>
+                  Cancel
+                </Button>
                 <Button onClick={handleUpdateOrder}>Update Order</Button>
               </div>
             </div>
@@ -333,3 +568,5 @@ export function OrdersModule() {
     </div>
   );
 }
+
+export default OrdersModule;
