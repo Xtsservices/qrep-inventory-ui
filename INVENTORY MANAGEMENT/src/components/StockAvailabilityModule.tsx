@@ -12,15 +12,21 @@ export function StockAvailabilityModule() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all');
     
-  const API_URL = "http://172.16.4.40:9000/api";
+  const API_URL = "http://172.16.4.56:9000/api";
   // Fetch stock data from API
 useEffect(() => {
   axios.get(`${API_URL}/stocks`)
     .then(res => {
+      console.log("Stock API response:", res.data); // 👈 check field names
       if (res.data.success) {
         const transformed = res.data.data.map(item => {
-          const quantity = item.quantity != null && !isNaN(item.quantity) ? Number(item.quantity) : 0;
-          const minThreshold = item.min_threshold != null && !isNaN(item.min_threshold) ? Number(item.min_threshold) : 0;
+          const quantity = item.current_stock != null && !isNaN(item.current_stock) 
+            ? Number(item.current_stock) 
+            : 0;   // 👈 change "quantity" to match backend
+          
+          const minThreshold = item.min_threshold != null && !isNaN(item.min_threshold) 
+            ? Number(item.min_threshold) 
+            : 0;
 
           let status = 'Unavailable';
           if (quantity > 0 && quantity > minThreshold) status = 'Available';
@@ -41,6 +47,7 @@ useEffect(() => {
     })
     .catch(err => console.error('Error fetching stock:', err));
 }, []);
+
 
 
   // Badge variant based on status

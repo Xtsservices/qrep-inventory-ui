@@ -16,7 +16,7 @@ import { Badge } from './ui/badge';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const API_URL = 'http://172.16.4.40:9000/api/items';
+const API_URL = 'http://172.16.4.56:9000/api/items';
 
 export function ItemsModule() {
   const [items, setItems] = useState([]);
@@ -210,11 +210,14 @@ export function ItemsModule() {
   // -----------------------------
   const handleEdit = (item) => {
     console.log('Editing item:', item); // ✅ Debug log
+      // Normalize type to match the options in Select
+  const normalizedType =
+    itemTypes.find(t => t.toLowerCase() === (item.type ?? '').toLowerCase().trim()) || '';
     
     setEditingItem(item);
     setFormData({
       name: item.name ?? '',
-      type: item.type ?? '',
+       type: normalizedType,  
       status_id: item.status_id?.toString() ?? '1', // ✅ Fixed: Use status_id
       units: item.units ?? '',
       kg: item.kg ?? '',
@@ -227,49 +230,44 @@ export function ItemsModule() {
   // -----------------------------
   // DELETE (mark inactive)
   // -----------------------------
-  const handleDelete = async (item) => {
-    if (!confirm(`Are you sure you want to mark "${item.name}" as Inactive?`)) return;
+ // -----------------------------
+// DELETE (mark inactive)
+// -----------------------------
+const handleDelete = async (item) => {
+  if (!confirm(`Are you sure you want to mark "${item.name}" as Inactive?`)) return;
 
-    try {
-      const itemId = item?.item_id?.toString().trim();
-      if (!itemId) throw new Error("Item ID is required");
+  try {
+    const itemId = item?.item_id?.toString().trim();
+    if (!itemId) throw new Error("Item ID is required");
 
-      console.log('Deleting item ID:', itemId);
+    console.log("Marking item inactive:", item);
 
-      const res = await fetch(`${API_URL}/${itemId}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-      });
+    // ✅ Include required fields: name, type, status_id
+    const res = await fetch(`${API_URL}/${itemId}`, {
+      method: "PUT", // or PATCH depending on backend
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        item_id: itemId,
+        name: item.name,   // required
+        type: item.type,   // required
+        status_id: 2       // mark inactive
+      }),
+    });
 
-      console.log(`Delete response status: ${res.status}`);
-
-      if (!res.ok) {
-        let data;
-        try {
-          data = await res.json();
-        } catch {
-          data = { message: 'Invalid response' };
-        }
-        console.error("Delete error response:", data);
-        throw new Error(data.error || data.message || "Failed to update item");
-      }
-
-      let successData;
-      try {
-        successData = await res.json();
-      } catch {
-        successData = { message: 'Success' };
-      }
-      
-      console.log("Delete success response:", successData);
-
-      toast.success(`Item "${item.name}" marked as Inactive!`);
-      await fetchItems();
-    } catch (err) {
-      console.error("Delete error:", err);
-      toast.error(err.message || "Something went wrong while marking item inactive");
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || data.message || "Failed to mark inactive");
     }
-  };
+
+    toast.success(`Item "${item.name}" marked as Inactive!`);
+    await fetchItems();
+  } catch (err) {
+    console.error("Delete error:", err);
+    toast.error(err.message || "Something went wrong while marking item inactive");
+  }
+};
+
+
 
   const handleCloseDialog = () => {
     setShowDialog(false);
@@ -449,46 +447,49 @@ export function ItemsModule() {
                   <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody >
                 {filteredItems.map((item, index) => (
                   <TableRow key={item.item_id ?? index}>
                     <TableCell>{index + 1}</TableCell>
                     <TableCell>{item.name}</TableCell>
                     <TableCell>{item.type}</TableCell>
                     <TableCell>
-                      {[item.units ? `${item.units} Units` : null, 
-                        item.kg ? `${item.kg} Kg` : null, 
-                        item.grams ? `${item.grams} g` : null, 
-                        item.litres ? `${item.litres} L` : null]
-                        .filter(Boolean)
-                        .join(', ') || 'N/A'}
-                    </TableCell>
+  {[
+    item.units > 0 ? `${item.units} Units` : null,
+    item.kg > 0 ? `${item.kg} Kg` : null,
+    item.grams > 0 ? `${item.grams} g` : null,
+    item.litres > 0 ? `${item.litres} L` : null,
+  ]
+    .filter(Boolean)
+    .join(', ') || 'N/A'}
+</TableCell>
+
                     <TableCell>
-                      <Badge 
-                        variant={item.status === 'Active' ? 'default' : 'destructive'}
-                        className={item.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
-                      >
-                        {item.status}
-                      </Badge>
+    <Badge variant={item.status_id === 1 ? "success" : "destructive"}>
+  {item.status}
+</Badge>
+
+
                     </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(item)}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(item)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                   <TableCell>
+  <div className="flex gap-2 justify-center">
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => handleEdit(item)}
+    >
+      <Edit className="w-4 h-4" />
+    </Button>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => handleDelete(item)}
+    >
+      <Trash2 className="w-4 h-4" />
+    </Button>
+  </div>
+</TableCell>
+
                   </TableRow>
                 ))}
               </TableBody>

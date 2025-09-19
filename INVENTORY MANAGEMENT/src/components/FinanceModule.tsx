@@ -28,26 +28,47 @@ export function FinanceModule() {
  
 
   // Fetch transactions from API
-  const fetchTransactions = async () => {
-    try {
-      const res = await axios.get('http://172.16.4.40:9000/api/billings'); // replace with your API URL
-      if (res.data.success) {
-        const formattedTransactions = res.data.data.map(txn => ({
+// Fetch transactions from API
+const fetchTransactions = async () => {
+  try {
+    const res = await axios.get('http://172.16.4.56:9000/api/billings');
+
+    if (res.data.success) {
+      const formattedTransactions = res.data.data.map(txn => {
+        // Ensure amount is numeric
+        const amount = txn.total !== null && txn.total !== undefined ? Number(txn.total) : 0;
+
+        // Correctly determine status
+        let status = 'Pending';
+        if (txn.billing_status) {
+          status = txn.billing_status === 'Paid' ? 'Paid' : 'Pending';
+        } else if (txn.status) {
+          status = txn.status === 'Paid' ? 'Paid' : 'Pending';
+        }
+
+        // Format date safely
+        const order_date = txn.order_date ? new Date(txn.order_date).toISOString() : null;
+
+        return {
           id: `TXN${txn.billing_id}`,
-          date: txn.date,
-          vendor_name: txn.vendor_name,
-          items: [txn.item_name], // assuming one item per billing
-          amount: txn.total,
-          status: txn.status,
-          notes: txn.notes
-        }));
-        setTransactions(formattedTransactions);
-      }
-    } catch (err) {
-      console.error('Error fetching transactions:', err);
-      toast.error('Failed to load transactions');
+          order_date,
+          vendor_name: txn.vendor_name || 'N/A',
+          items: txn.item_name ? [txn.item_name] : [],
+          amount,
+          status,
+          notes: txn.notes || ''
+        };
+      });
+
+      setTransactions(formattedTransactions);
     }
-  };
+  } catch (err) {
+    console.error('Error fetching transactions:', err);
+    toast.error('Failed to load transactions');
+  }
+};
+
+
 
   useEffect(() => {
     fetchTransactions();
@@ -249,7 +270,22 @@ const vendorExpenseData = transactions.reduce((acc: any[], txn: any) => {
                 transactions.map((transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell className="font-mono">{transaction.id}</TableCell>
-                    <TableCell>{new Date(transaction.date).toLocaleDateString()}</TableCell>
+              <TableCell>
+  {transaction.order_date
+    ? (() => {
+        const d = new Date(transaction.order_date);
+        return isNaN(d.getTime())
+          ? "Invalid Date"
+          : d.toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }).replace(/ /g, "-"); // Example: 19-Sep-2025
+      })()
+    : "N/A"}
+</TableCell>
+
+
                     <TableCell>{transaction.vendor_name}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
@@ -262,9 +298,10 @@ const vendorExpenseData = transactions.reduce((acc: any[], txn: any) => {
                     </TableCell>
                     <TableCell>₹{transaction.amount.toLocaleString()}</TableCell>
                     <TableCell>
-                      <Badge variant={transaction.status === 'Paid' ? 'default' : 'destructive'}>
-                        {transaction.status}
-                      </Badge>
+                     <Badge variant={transaction.status === 'Paid' ? 'default' : 'destructive'}>
+  {transaction.status}
+</Badge>
+
                     </TableCell>
                   </TableRow>
                 ))

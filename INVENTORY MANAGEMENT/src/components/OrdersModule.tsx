@@ -12,9 +12,9 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Plus, Edit, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-const API_VENDORS = 'http://172.16.4.40:9000/api/vendors';
-const API_ITEMS = 'http://172.16.4.40:9000/api/items';
-const API_ORDERS = 'http://172.16.4.40:9000/api/orders';
+const API_VENDORS = 'http://172.16.4.56:9000/api/vendors';
+const API_ITEMS = 'http://172.16.4.56:9000/api/items';
+const API_ORDERS = 'http://172.16.4.56:9000/api/orders';
 
 
 

@@ -31,100 +31,60 @@ export function UsersModule() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [viewingUser, setViewingUser] = useState<any>(null);
   const [editingUser, setEditingUser] = useState<any>(null);
-  const [errors, setErrors] = useState({
-  name: '',
-  mobileNumber: '',
-  email: '',
-  role: ''
-});
+  const [errors, setErrors] = useState({ name: '', mobileNumber: '', email: '', role: '' });
 
-  const [userFormData, setUserFormData] = useState({
-    name: '', mobileNumber: '', email: '', role: '', status: 'Active'
-  });
+  const [userFormData, setUserFormData] = useState({ name: '', mobileNumber: '', email: '', role: '', status: 'Active' });
+  const [editFormData, setEditFormData] = useState({ name: '', mobileNumber: '', email: '', role: '', status: 'Active' });
 
-  const [editFormData, setEditFormData] = useState({
-    name: '', mobileNumber: '', email: '', role: '', status: 'Active'
-  });
-
-  const API_BASE = 'http://172.16.4.40:9000/api/users';
+  const API_BASE = 'http://172.16.4.56:9000/api/users';
 
   useEffect(() => { fetchUsers(); }, []);
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get(API_BASE);
-      if (response.data.success) setUsers(response.data.data);
+      const res = await axios.get(API_BASE);
+      if (res.data.success) {
+        setUsers(res.data.data); // backend should already send status: 'Active'|'Inactive'
+      }
     } catch (err) {
       console.error(err);
       toast.error('Failed to fetch users');
     }
   };
 
-const validateForm = (data: any) => {
-  let valid = true;
-  let newErrors = { name: '', mobileNumber: '', email: '', role: '' };
+  const validateForm = (data: any) => {
+    let valid = true;
+    let newErrors = { name: '', mobileNumber: '', email: '', role: '' };
 
-  // Name validation
-  if (!data.name.trim()) {
-    newErrors.name = 'Please enter user name';
-    toast.error(newErrors.name);   // show toast
-    valid = false;
-  } else if (!/^[A-Za-z\s]{2,50}$/.test(data.name.trim())) {
-    newErrors.name = 'Name should contain only letters and spaces';
-    toast.error(newErrors.name);
-    valid = false;
-  }
+    if (!data.name.trim()) {
+      newErrors.name = 'Please enter user name'; valid = false;
+    } else if (!/^[A-Za-z\s]{2,50}$/.test(data.name.trim())) {
+      newErrors.name = 'Name should contain only letters and spaces'; valid = false;
+    }
 
-  // Mobile Number
-  if (!data.mobileNumber.trim()) {
-    newErrors.mobileNumber = 'Please enter mobile number';
-    toast.error(newErrors.mobileNumber);
-    valid = false;
-  } else if (!/^\d{10}$/.test(data.mobileNumber)) {
-    newErrors.mobileNumber = 'Please enter a valid 10-digit mobile number';
-    toast.error(newErrors.mobileNumber);
-    valid = false;
-  }
+    if (!data.mobileNumber.trim()) {
+      newErrors.mobileNumber = 'Please enter mobile number'; valid = false;
+    } else if (!/^\d{10}$/.test(data.mobileNumber)) {
+      newErrors.mobileNumber = 'Please enter a valid 10-digit mobile number'; valid = false;
+    }
 
-  // Email
-  if (!data.email.trim()) {
-    newErrors.email = 'Please enter email address';
-    toast.error(newErrors.email);
-    valid = false;
-  } else if (!/\S+@\S+\.\S+/.test(data.email)) {
-    newErrors.email = 'Please enter a valid email address';
-    toast.error(newErrors.email);
-    valid = false;
-  }
+    if (!data.email.trim()) {
+      newErrors.email = 'Please enter email address'; valid = false;
+    } else if (!/\S+@\S+\.\S+/.test(data.email)) {
+      newErrors.email = 'Please enter a valid email address'; valid = false;
+    }
 
-  // Role
-  if (!data.role) {
-    newErrors.role = 'Please select a role';
-    toast.error(newErrors.role);
-    valid = false;
-  }
+    if (!data.role) { newErrors.role = 'Please select a role'; valid = false; }
 
-  // Duplicate check
-  const isDuplicateNumber = users.some(u => u.mobileNumber === data.mobileNumber && u.id !== data.id);
-  const isDuplicateEmail = users.some(u => u.email === data.email && u.id !== data.id);
+    // Frontend duplicate check
+    const isDuplicateNumber = users.some(u => u.mobileNumber === data.mobileNumber && u.id !== data.id);
+    const isDuplicateEmail = users.some(u => u.email === data.email && u.id !== data.id);
+    if (isDuplicateNumber) { newErrors.mobileNumber = 'Mobile number already exists'; valid = false; }
+    if (isDuplicateEmail) { newErrors.email = 'Email address already exists'; valid = false; }
 
-  if (isDuplicateNumber) {
-    newErrors.mobileNumber = 'Mobile number already exists';
-    toast.error(newErrors.mobileNumber);  // toast for duplicate
-    valid = false;
-  }
-
-  if (isDuplicateEmail) {
-    newErrors.email = 'Email address already exists';
-    toast.error(newErrors.email);         // toast for duplicate
-    valid = false;
-  }
-
-  setErrors(newErrors);
-  return valid;
-};
-
-
+    setErrors(newErrors);
+    return valid;
+  };
 
   const resetForm = () => setUserFormData({ name: '', mobileNumber: '', email: '', role: '', status: 'Active' });
 
@@ -134,13 +94,11 @@ const validateForm = (data: any) => {
     try {
       const res = await axios.post(API_BASE, userFormData);
       if (res.data.success) {
-        toast.success('User added successfully!');
+        toast.success('User added successfully');
         fetchUsers();
         resetForm();
         setShowAddDialog(false);
-      } else {
-        toast.error(res.data.error || 'Failed to add user');
-      }
+      } else { toast.error(res.data.error || 'Failed to add user'); }
     } catch (err: any) {
       console.error(err);
       toast.error(err.response?.data?.error || 'Failed to add user');
@@ -151,12 +109,10 @@ const validateForm = (data: any) => {
   const handleViewUser = async (userId: string) => {
     try {
       const res = await axios.get(`${API_BASE}/${userId}`);
-      if (res.data.success && res.data.data) {
+      if (res.data.success) {
         setViewingUser(res.data.data);
         setShowViewDialog(true);
-      } else {
-        toast.error('User not found');
-      }
+      } else { toast.error('User not found'); }
     } catch (err) {
       console.error(err);
       toast.error('Failed to fetch user details');
@@ -165,45 +121,38 @@ const validateForm = (data: any) => {
 
   // Edit User
   const handleUpdateUser = async () => {
-    if (!editingUser) { toast.error("No user selected to edit"); return; }
+    if (!editingUser) { toast.error('No user selected'); return; }
     if (!validateForm(editFormData)) return;
-
     try {
       const res = await axios.put(`${API_BASE}/${editingUser.id}`, editFormData);
       if (res.data.success) {
-        toast.success('User updated successfully!');
+        toast.success('User updated successfully');
         fetchUsers();
         setShowEditDialog(false);
-      } else {
-        toast.error(res.data.error || 'Failed to update user');
-      }
+      } else { toast.error(res.data.error || 'Failed to update user'); }
     } catch (err: any) {
       console.error(err);
       toast.error(err.response?.data?.error || 'Failed to update user');
     }
   };
 
-  // Delete = mark Inactive
+  // Delete = Mark Inactive
   const handleDeleteUser = async (userId: string) => {
     try {
       const res = await axios.put(`${API_BASE}/${userId}`, { status: 'Inactive' });
       if (res.data.success) {
         toast.success('User marked as inactive');
         fetchUsers();
-      } else {
-        toast.error(res.data.error || 'Failed to mark inactive');
-      }
+      } else { toast.error(res.data.error || 'Failed to mark inactive'); }
     } catch (err: any) {
       console.error(err);
       toast.error(err.response?.data?.error || 'Failed to mark inactive');
     }
   };
 
-  const getRoleBadgeVariant = (role: string) =>
+  const getRoleBadgeVariant = (role: string) => 
     role === 'Admin' ? 'destructive' : role === 'Manager' ? 'default' : 'secondary';
-
-  const getStatusBadgeVariant = (status: string) =>
-    status === 'Active' ? 'success' : 'destructive';
+  const getStatusBadgeVariant = (status: string) => status === 'Active' ? 'success' : 'destructive';
 
   return (
     <div className="space-y-6">
@@ -234,51 +183,45 @@ const validateForm = (data: any) => {
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+          <TableBody>
               {users.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    No users found
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No users found</TableCell>
+                </TableRow>
+              ) : users.map((user,index) => (
+                <TableRow key={user.id}>
+                  <TableCell>{index + 1}</TableCell>
+                  <TableCell>{user.name}</TableCell>
+                  <TableCell><Badge variant={getRoleBadgeVariant(user.role)}>{user.role}</Badge></TableCell>
+                  <TableCell>{user.mobileNumber}</TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell><Badge variant={getStatusBadgeVariant(user.status)}>{user.status}</Badge></TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => handleViewUser(user.id)}>
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete User</AlertDialogTitle>
+                            <p>Are you sure you want to mark <b>{user.name}</b> as inactive?</p>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>No</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDeleteUser(user.id)}>Yes, Mark Inactive</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </TableCell>
                 </TableRow>
-              ) : (
-                users.map((user,index) => (
-                  <TableRow key={user.id}>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell>{user.name}</TableCell>  
-                    <TableCell><Badge variant={getRoleBadgeVariant(user.role)}>{user.role}</Badge></TableCell>
-                    <TableCell>{user.mobileNumber}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell><Badge variant={getStatusBadgeVariant(user.status)}>{user.status}</Badge></TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => handleViewUser(user.id)}>
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete User</AlertDialogTitle>
-                              <p>Are you sure you want to mark <b>{user.name}</b> as inactive?</p>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>No</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDeleteUser(user.id)}>
-                                Yes, Mark Inactive
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
+              ))}
             </TableBody>
           </Table>
         </CardContent>
@@ -416,7 +359,7 @@ const validateForm = (data: any) => {
                 <div><p className="text-muted-foreground font-medium">Status</p><Badge variant={getStatusBadgeVariant(viewingUser.status)}>{viewingUser.status}</Badge></div>
               </div>
 
-              <div className="flex justify-end gap-2 mt-4">
+              <div className="flex justify-center gap-2 mt-4">
                 <Button variant="outline" onClick={() => setShowViewDialog(false)}>Close</Button>
                 <Button onClick={() => {
                   setEditingUser(viewingUser);

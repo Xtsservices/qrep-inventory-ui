@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './components/LoginPage';
 import { Dashboard } from './components/Dashboard';
 import { Toaster } from './components/ui/sonner';
@@ -7,7 +8,6 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Check if user is already logged in
   useEffect(() => {
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
@@ -34,13 +34,33 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {!isAuthenticated ? (
-        <LoginPage onLogin={handleLogin} />
-      ) : (
-        <Dashboard currentUser={currentUser} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />
-      )}
+    <Router>
+      <Routes>
+        {/* Login */}
+        <Route
+          path="/login"
+          element={isAuthenticated ? <Navigate to="/dashboard/overview" replace /> : <LoginPage onLogin={handleLogin} />}
+        />
+
+        {/* Dashboard */}
+<Route
+  path="/dashboard/*"
+  element={
+    isAuthenticated ? (
+      <Dashboard currentUser={currentUser} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />
+    ) : (
+      <Navigate to="/login" replace />
+    )
+  }
+/>
+
+
+
+        {/* Default redirect */}
+        <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard/overview" : "/login"} replace />} />
+      </Routes>
+
       <Toaster />
-    </div>
+    </Router>
   );
 }
