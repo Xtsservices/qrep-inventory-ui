@@ -29,6 +29,7 @@ import { Plus, Eye, Trash } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 
+
 const API_URL = "http://172.16.4.139:9000/api/vendors";
 
 export function VendorsModule() {
@@ -173,6 +174,7 @@ export function VendorsModule() {
     setShowViewDialog(true);
   };
 
+
   const handleDelete = async (vendor_id: string) => {
     if (!confirm("Are you sure you want to delete this vendor?")) return;
 
@@ -185,6 +187,8 @@ export function VendorsModule() {
       toast.error(error.response?.data?.message || "Failed to delete vendor");
     }
   };
+
+
 
   return (
     <div className="space-y-6">

@@ -1,71 +1,99 @@
-import React, { useState } from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Search } from 'lucide-react';
-
-const initialStock = [
-  { id: 1, itemName: 'Basmati Rice', quantity: 45, unit: 'kg', minThreshold: 10, status: 'Available' },
-  { id: 2, itemName: 'Toor Dal', quantity: 25, unit: 'kg', minThreshold: 5, status: 'Available' },
-  { id: 3, itemName: 'Refined Oil', quantity: 8, unit: 'liters', minThreshold: 10, status: 'Low Stock' },
-  { id: 4, itemName: 'Onions', quantity: 0, unit: 'kg', minThreshold: 5, status: 'Unavailable' },
-  { id: 5, itemName: 'Turmeric Powder', quantity: 3, unit: 'kg', minThreshold: 2, status: 'Available' },
-  { id: 6, itemName: 'Wheat Flour', quantity: 50, unit: 'kg', minThreshold: 15, status: 'Available' },
-  { id: 7, itemName: 'Sugar', quantity: 12, unit: 'kg', minThreshold: 8, status: 'Available' },
-  { id: 8, itemName: 'Salt', quantity: 0, unit: 'kg', minThreshold: 3, status: 'Unavailable' },
-  { id: 9, itemName: 'Cumin Seeds', quantity: 1, unit: 'kg', minThreshold: 2, status: 'Low Stock' },
-  { id: 10, itemName: 'Coriander Seeds', quantity: 15, unit: 'kg', minThreshold: 3, status: 'Available' }
-];
+import React, { useState, useEffect } from "react";
+import { stocksApi } from "../api/api"; // adjust import path based on your project
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Badge } from "./ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Input } from "./ui/input";
+import { Search } from "lucide-react";
 
 export function StockAvailabilityModule() {
-  const [stock] = useState(initialStock);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('all');
+  const [stock, setStock] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState("all");
 
-  const getStatusVariant = (status) => {
+  // ✅ Fetch stock data
+  useEffect(() => {
+    stocksApi
+      .getAll()
+      .then((res: any) => {
+        console.log("Stock API response:", res);
+        if (res.success) {
+          const transformed = res.data.map((item: any) => {
+            const quantity =
+              item.current_stock != null && !isNaN(item.current_stock)
+                ? Number(item.current_stock)
+                : 0;
+
+            const minThreshold =
+              item.min_threshold != null && !isNaN(item.min_threshold)
+                ? Number(item.min_threshold)
+                : 0;
+
+            let status = "Unavailable";
+            if (quantity > 0 && quantity > minThreshold) status = "Available";
+            else if (quantity > 0 && quantity <= minThreshold) status = "Low Stock";
+
+            return {
+              id: item.stock_id,
+              itemName: item.item_name,
+              quantity,
+              unit: item.unit || "-",
+              minThreshold,
+              status,
+            };
+          });
+
+          setStock(transformed);
+        }
+      })
+      .catch((err) => console.error("Error fetching stock:", err));
+  }, []);
+
+  // ✅ Badge variants
+  const getStatusVariant = (status: string) => {
     switch (status) {
-      case 'Available':
-        return 'default';
-      case 'Low Stock':
-        return 'destructive';
-      case 'Unavailable':
-        return 'secondary';
+      case "Available":
+        return "default";
+      case "Low Stock":
+        return "destructive";
+      case "Unavailable":
+        return "secondary";
       default:
-        return 'secondary';
+        return "secondary";
     }
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Available':
-        return 'text-green-600';
-      case 'Low Stock':
-        return 'text-orange-600';
-      case 'Unavailable':
-        return 'text-red-600';
+      case "Available":
+        return "text-green-600";
+      case "Low Stock":
+        return "text-orange-600";
+      case "Unavailable":
+        return "text-red-600";
       default:
-        return 'text-gray-600';
+        return "text-gray-600";
     }
   };
 
-  const filteredStock = stock.filter(item => {
+  // ✅ Filter by search + tab
+  const filteredStock = stock.filter((item) => {
     const matchesSearch = item.itemName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTab = activeTab === 'all' || 
-                      (activeTab === 'available' && item.status === 'Available') ||
-                      (activeTab === 'unavailable' && item.status === 'Unavailable') ||
-                      (activeTab === 'low-stock' && item.status === 'Low Stock');
+    const matchesTab =
+      activeTab === "all" ||
+      (activeTab === "available" && item.status === "Available") ||
+      (activeTab === "unavailable" && item.status === "Unavailable") ||
+      (activeTab === "low-stock" && item.status === "Low Stock");
     return matchesSearch && matchesTab;
   });
 
+  // ✅ Summary counts
   const stockSummary = {
-    available: stock.filter(item => item.status === 'Available').length,
-    unavailable: stock.filter(item => item.status === 'Unavailable').length,
-    lowStock: stock.filter(item => item.status === 'Low Stock').length,
-    total: stock.length
+    available: stock.filter((item) => item.status === "Available").length,
+    unavailable: stock.filter((item) => item.status === "Unavailable").length,
+    lowStock: stock.filter((item) => item.status === "Low Stock").length,
+    total: stock.length,
   };
 
   return (
@@ -114,9 +142,9 @@ export function StockAvailabilityModule() {
         <CardHeader>
           <CardTitle>Stock Inventory</CardTitle>
           <CardDescription>Current stock levels for all items</CardDescription>
-          
+
           {/* Search Bar */}
-          <div className="flex items-center gap-2 max-w-sm">
+          <div className="flex items-center gap-2 max-w-sm mt-2">
             <div className="relative flex-1">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -128,6 +156,7 @@ export function StockAvailabilityModule() {
             </div>
           </div>
         </CardHeader>
+
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-4">
@@ -136,20 +165,20 @@ export function StockAvailabilityModule() {
               <TabsTrigger value="low-stock">Low Stock ({stockSummary.lowStock})</TabsTrigger>
               <TabsTrigger value="unavailable">Out of Stock ({stockSummary.unavailable})</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value={activeTab} className="mt-4">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Item Name</TableHead>
-                    <TableHead>Current Stock</TableHead>
-                    <TableHead>Unit</TableHead>
-                    <TableHead>Min Threshold</TableHead>
-                    <TableHead>Status</TableHead>
+                  <TableRow >
+                    <TableHead className="text-center">Item Name</TableHead>
+                    <TableHead className="text-center">Current Stock</TableHead>
+                    <TableHead className="text-center">Unit</TableHead>
+                    <TableHead className="text-center">Min Threshold</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {filteredStock.map((item) => (
+                <TableBody className="text-center">
+                  {filteredStock?.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">{item.itemName}</TableCell>
                       <TableCell>
@@ -168,7 +197,7 @@ export function StockAvailabilityModule() {
                   ))}
                 </TableBody>
               </Table>
-              
+
               {filteredStock.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   No items found matching your criteria.
