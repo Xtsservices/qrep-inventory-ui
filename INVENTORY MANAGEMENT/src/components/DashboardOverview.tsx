@@ -6,9 +6,9 @@ import {
 } from 'recharts';
 import { Package, Users, AlertTriangle, TrendingUp } from 'lucide-react';
 
-const ITEMS_API_URL = 'http://172.16.4.56:9000/api/items';
-const VENDORS_API_URL = 'http://172.16.4.56:9000/api/vendors';
-const ORDERS_API_URL = 'http://172.16.4.56:9000/api/orders';
+const ITEMS_API_URL = 'http://172.16.4.139:9000/api/items';
+const VENDORS_API_URL = 'http://172.16.4.139:9000/api/vendors';
+const ORDERS_API_URL = 'http://172.16.4.139:9000/api/orders';
 
 export function DashboardOverview() {
   const [itemsCount, setItemsCount] = useState(0);
@@ -30,7 +30,7 @@ export function DashboardOverview() {
 
           // Group items by category or type for consumption (adjust as needed)
           const consumption = {};
-          data.data.forEach(item => {
+          data?.data?.forEach(item => {
             const category = item.category || item.type || item.name || 'Others';
             const qty = Number(item.quantity_consumed || item.quantity || 1);
             consumption[category] = (consumption[category] || 0) + qty;

@@ -76,7 +76,7 @@ export function InventoryRequestModule() {
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const response = await fetch('http://172.16.4.56:9000/api/items');
+        const response = await fetch('http://172.16.4.139:9000/api/items');
         if (!response.ok) throw new Error('Failed to fetch items');
         const json = await response.json();
         console.log('Items API response:', json);

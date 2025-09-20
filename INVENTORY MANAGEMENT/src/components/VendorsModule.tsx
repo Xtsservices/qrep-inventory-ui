@@ -30,8 +30,7 @@ import { toast } from "sonner";
 import axios from "axios";
 
 
-const API_URL = "http://172.16.4.56:9000/api/vendors";
-
+const API_URL = "http://172.16.4.139:9000/api/vendors";
 
 export function VendorsModule() {
   const [vendors, setVendors] = useState<any[]>([]);
@@ -98,25 +97,36 @@ export function VendorsModule() {
 
     // Contact Person
     if (!formData.contact_person.trim()) errors.contact_person = "Contact Person is required";
-
-    // Contact Email (optional)
-    if (formData.contact_email && !/^\S+@\S+\.\S+$/.test(formData.contact_email)) {
-      errors.contact_email = "Invalid email format";
+     // Contact Mobile (now required)
+     if (!formData.contact_mobile.trim()) {
+       errors.contact_mobile = "Contact Mobile is required";
+       } else if (!/^[6-9]\d{9}$/.test(formData.contact_mobile)) {
+       errors.contact_mobile = "Enter a valid 10-digit Indian mobile number";
     }
+    // Contact Email (optional)
+    if (!formData.contact_email.trim()) {
+    errors.contact_email = "Contact Email is required";
+  } else if (!/^\S+@\S+\.\S+$/.test(formData.contact_email)) {
+    errors.contact_email = "Invalid email format";
+  }
 
     // GST Number (optional but validated if filled)
-    if (
-      formData.gst_number &&
-      !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(formData.gst_number)
-    ) {
-      errors.gst_number = "Invalid GST Number";
-    }
+    if (!formData.gst_number.trim()) {
+    errors.gst_number = "GST Number is required";
+  } else if (
+    !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(formData.gst_number)
+  ) {
+    errors.gst_number = "Invalid GST Number";
+  }
 
     // PAN Number (optional but validated if filled)
-    if (formData.pan_number && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.pan_number)) {
-      errors.pan_number = "Invalid PAN Number";
-    }
-
+    if (!formData.pan_number.trim()) {
+    errors.pan_number = "PAN Number is required";
+  } else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.pan_number)) {
+    errors.pan_number = "Invalid PAN Number";
+  }
+   // Full Address (now required)
+  if (!formData.full_address.trim()) errors.full_address = "Full Address is required";
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -345,7 +355,11 @@ export function VendorsModule() {
                     onChange={(e) =>
                       setFormData({ ...formData, full_address: e.target.value })
                     }
+                    className={formErrors.full_address ? "border-red-600" : ""}
                   />
+                  {formErrors.full_address && (
+                    <p className="text-red-600 text-sm mt-1">{formErrors.full_address}</p>
+                  )}
                 </div>
 
                 {/* Submit Button */}
