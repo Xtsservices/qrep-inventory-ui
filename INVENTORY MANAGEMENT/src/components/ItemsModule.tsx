@@ -13,9 +13,11 @@ import {
 } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
+
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { itemsApi } from "../api/api";
+
 
 export function ItemsModule() {
   const [items, setItems] = useState([]);
@@ -43,6 +45,7 @@ export function ItemsModule() {
   // -----------------------------
   const fetchItems = async () => {
     try {
+
       const data = await itemsApi.getAll();
       const raw = Array.isArray(data) ? data : data.data || [];
 
@@ -65,6 +68,7 @@ export function ItemsModule() {
       });
 
       setItems(normalizedItems.reverse());
+
     } catch (err) {
       console.error("Fetch items error:", err);
       toast.error("Error fetching items");
@@ -196,9 +200,11 @@ export function ItemsModule() {
   const handleDelete = async (item) => {
     if (!confirm(`Are you sure you want to mark "${item.name}" as Inactive?`)) return;
     try {
+
       await itemsApi.update(item.item_id, { ...item, status_id: 2 });
       toast.success(`Item "${item.name}" marked as Inactive!`);
       await fetchItems();
+
     } catch (err) {
       console.error("Delete error:", err);
       toast.error(err.message || "Failed to mark inactive");

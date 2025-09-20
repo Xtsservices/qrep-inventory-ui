@@ -1,49 +1,149 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell
+} from 'recharts';
 import { Package, Users, AlertTriangle, TrendingUp } from 'lucide-react';
 
-const statsData = [
-  {
-    title: 'Total Items',
-    value: '248',
-    icon: Package,
-    description: 'Active inventory items',
-    trend: '+12%'
-  },
-  {
-    title: 'Vendors',
-    value: '32',
-    icon: Users,
-    description: 'Registered vendors',
-    trend: '+3%'
-  },
-  {
-    title: 'Lost Stock',
-    value: '15',
-    icon: AlertTriangle,
-    description: 'Items out of stock',
-    trend: '-8%'
-  }
-];
-
-const mostOrderedItems = [
-  { name: 'Rice', orders: 45, value: 45 },
-  { name: 'Dal', orders: 38, value: 38 },
-  { name: 'Oil', orders: 32, value: 32 },
-  { name: 'Vegetables', orders: 28, value: 28 },
-  { name: 'Spices', orders: 22, value: 22 },
-];
-
-const mostConsumedItems = [
-  { name: 'Rice', value: 35, fill: '#0088FE' },
-  { name: 'Dal', value: 25, fill: '#00C49F' },
-  { name: 'Vegetables', value: 20, fill: '#FFBB28' },
-  { name: 'Oil', value: 12, fill: '#FF8042' },
-  { name: 'Others', value: 8, fill: '#8884d8' },
-];
+const ITEMS_API_URL = 'http://172.16.4.56:9000/api/items';
+const VENDORS_API_URL = 'http://172.16.4.56:9000/api/vendors';
+const ORDERS_API_URL = 'http://172.16.4.56:9000/api/orders';
 
 export function DashboardOverview() {
+  const [itemsCount, setItemsCount] = useState(0);
+  const [vendorsCount, setVendorsCount] = useState(0);
+  const [mostOrderedItems, setMostOrderedItems] = useState([]);
+  const [mostConsumedItems, setMostConsumedItems] = useState([]);
+
+  // Fetch items count & consumption distribution
+  useEffect(() => {
+    const fetchItems = async () => {
+      try {
+        const res = await fetch(ITEMS_API_URL);
+        if (!res.ok) throw new Error('Failed to fetch items');
+        const data = await res.json();
+        console.log('Items API data:', data);
+
+        if (Array.isArray(data.data)) {
+          setItemsCount(data.data.length);
+
+          // Group items by category or type for consumption (adjust as needed)
+          const consumption = {};
+          data.data.forEach(item => {
+            const category = item.category || item.type || item.name || 'Others';
+            const qty = Number(item.quantity_consumed || item.quantity || 1);
+            consumption[category] = (consumption[category] || 0) + qty;
+          });
+
+          // Convert to array for recharts
+          const consumedArray = Object.entries(consumption).map(([name, value], index) => ({
+            name,
+            value,
+            // generate a color for each slice
+            fill: ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'][index % 5]
+          }));
+
+          consumedArray.sort((a, b) => b.value - a.value);
+          setMostConsumedItems(consumedArray.slice(0, 5));
+        }
+      } catch (error) {
+        console.error('Error fetching items:', error);
+      }
+    };
+    fetchItems();
+  }, []);
+
+  // Fetch vendors count
+  useEffect(() => {
+    const fetchVendors = async () => {
+      try {
+        const res = await fetch(VENDORS_API_URL);
+        if (!res.ok) throw new Error('Failed to fetch vendors');
+        const data = await res.json();
+        setVendorsCount(Array.isArray(data.data) ? data.data.length : 0);
+      } catch (error) {
+        console.error('Error fetching vendors:', error);
+      }
+    };
+    fetchVendors();
+  }, []);
+
+  // Fetch most ordered items dynamically from orders API
+useEffect(() => {
+  const fetchOrders = async () => {
+    try {
+      const res = await fetch(ORDERS_API_URL);
+      if (!res.ok) throw new Error('Failed to fetch orders');
+      const data = await res.json();
+      console.log('Orders API data:', data);
+
+      // ✅ Make sure we always have an array
+      const ordersArray = Array.isArray(data)
+        ? data
+        : Array.isArray(data.data)
+        ? data.data
+        : [data];
+
+      const orderCounts: Record<string, number> = {};
+
+      ordersArray.forEach(order => {
+        if (Array.isArray(order.items)) {
+          order.items.forEach(itemObj => {
+            const itemName = itemObj.name || itemObj.item;
+            const quantity = Number(itemObj.quantity) || 1;
+            if (itemName) {
+              orderCounts[itemName] =
+                (orderCounts[itemName] || 0) + quantity;
+            }
+          });
+        }
+      });
+
+      // Convert to array for recharts
+      const itemsArray = Object.entries(orderCounts).map(([name, orders]) => ({
+        name,
+        orders,
+      }));
+
+      // Sort descending & take top 5
+      itemsArray.sort((a, b) => b.orders - a.orders);
+      setMostOrderedItems(itemsArray.slice(0, 5));
+      console.log('Most ordered items array:', itemsArray.slice(0, 5));
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    }
+  };
+
+  fetchOrders();
+}, []);
+
+
+  // Stats Cards Data
+  const statsData = [
+    {
+      title: 'Total Items',
+      value: itemsCount,
+      icon: Package,
+      description: 'Active inventory items',
+      trend: '+12%'
+    },
+    {
+      title: 'Vendors',
+      value: vendorsCount,
+      icon: Users,
+      description: 'Registered vendors',
+      trend: '+3%'
+    },
+    {
+      title: 'Lost Stock',
+      value: '15',
+      icon: AlertTriangle,
+      description: 'Items out of stock',
+      trend: '-8%'
+    }
+  ];
+
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
@@ -69,6 +169,7 @@ export function DashboardOverview() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Most Ordered Items */}
         <Card>
           <CardHeader>
             <CardTitle>Most Ordered Items</CardTitle>
@@ -87,6 +188,7 @@ export function DashboardOverview() {
           </CardContent>
         </Card>
 
+        {/* Most Consumed Items */}
         <Card>
           <CardHeader>
             <CardTitle>Most Consumed Items</CardTitle>
