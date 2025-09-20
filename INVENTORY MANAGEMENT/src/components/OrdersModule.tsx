@@ -38,9 +38,12 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Plus, Edit, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-const API_VENDORS = 'http://172.16.4.56:9000/api/vendors';
-const API_ITEMS = 'http://172.16.4.56:9000/api/items';
-const API_ORDERS = 'http://172.16.4.56:9000/api/orders';
+const API_VENDORS = 'http://172.16.4.139:9000/api/vendors';
+const API_ITEMS = 'http://172.16.4.139:9000/api/items';
+const API_ORDERS = 'http://172.16.4.139:9000/api/orders';
+
+// Units for dropdown
+const UNITS = ['KG', 'Liters', 'Pieces', 'Box'];
 
 interface Vendor {
   id: string;
@@ -55,6 +58,7 @@ interface Item {
 interface BulkItem {
   itemId: string;
   quantity: string;
+  unit?: string;
 }
 
 interface OrderFormData {
@@ -63,6 +67,7 @@ interface OrderFormData {
   singleItemId: string;
   bulkItems: BulkItem[];
   quantity: string;
+  unit: string;
   notes: string;
 }
 
@@ -85,8 +90,9 @@ export function OrdersModule() {
     orderType: 'single',
     vendorId: '',
     singleItemId: '',
-    bulkItems: [{ itemId: '', quantity: '' }],
+    bulkItems: [{ itemId: '', quantity: '', unit: '' }],
     quantity: '',
+    unit: '',
     notes: ''
   });
 
@@ -126,28 +132,25 @@ export function OrdersModule() {
       .catch(err => console.error('Items fetch error', err));
   }, []);
 
-// Fetch orders
-const fetchOrders = () => {
-  fetch(API_ORDERS)
-    .then(res => res.json())
-    .then(data => {
-      // If API returns array, use it directly; if single object, wrap in array
-      const arr = Array.isArray(data) ? data : (data.data || [data]);
-
-      const mapped = arr.map((o: any) => ({
-        id: o.order_id,
-        vendorName: o.vendor_name,
-        date: o.date,
-        items: o.items,
-        status: o.status,
-        totalAmount: o.total, // your table shows totalAmount
-        notes: o.notes || ''
-      }));
-
-      setOrders(mapped);
-    })
-    .catch(err => console.error('Orders fetch error', err));
-};
+  // Fetch orders
+  const fetchOrders = () => {
+    fetch(API_ORDERS)
+      .then(res => res.json())
+      .then(data => {
+        const arr = Array.isArray(data) ? data : (data.data || [data]);
+        const mapped = arr.map((o: any) => ({
+          id: o.order_id,
+          vendorName: o.vendor_name,
+          date: o.date,
+          items: o.items,
+          status: o.status,
+          totalAmount: o.total,
+          notes: o.notes || ''
+        }));
+        setOrders(mapped);
+      })
+      .catch(err => console.error('Orders fetch error', err));
+  };
 
   useEffect(() => {
     fetchOrders();
@@ -167,6 +170,7 @@ const fetchOrders = () => {
         {
           item: selectedItem?.name || 'Unnamed',
           quantity: Number(orderFormData.quantity),
+          unit: orderFormData.unit,
           price: 0
         }
       ];
@@ -179,6 +183,7 @@ const fetchOrders = () => {
         return {
           item: selectedItem?.name || 'Unnamed',
           quantity: Number(i.quantity),
+          unit: i.unit,
           price: 0
         };
       });
@@ -193,7 +198,7 @@ const fetchOrders = () => {
 
     try {
       const orderPayload = {
-         order_id,
+        order_id,
         vendor_name: selectedVendor.name,
         date: new Date(),
         items,
@@ -217,8 +222,9 @@ const fetchOrders = () => {
         orderType: 'single',
         vendorId: '',
         singleItemId: '',
-        bulkItems: [{ itemId: '', quantity: '' }],
+        bulkItems: [{ itemId: '', quantity: '', unit: '' }],
         quantity: '',
+        unit: '',
         notes: ''
       });
       fetchOrders();
@@ -242,7 +248,8 @@ const fetchOrders = () => {
     const updatedItems = editFormData.map(i => ({
       item: i.item,
       price: i.price,
-      quantity: editingOrder.items.find((x: any) => (x.item || x.name) === i.item)?.quantity || 0
+      quantity: editingOrder.items.find((x: any) => (x.item || x.name) === i.item)?.quantity || 0,
+      unit: editingOrder.items.find((x: any) => (x.item || x.name) === i.item)?.unit || ''
     }));
 
     const payload = {
@@ -279,7 +286,7 @@ const fetchOrders = () => {
   const addBulkItem = () =>
     setOrderFormData({
       ...orderFormData,
-      bulkItems: [...orderFormData.bulkItems, { itemId: '', quantity: '' }]
+      bulkItems: [...orderFormData.bulkItems, { itemId: '', quantity: '', unit: '' }]
     });
 
   const removeBulkItem = (index: number) =>
@@ -359,8 +366,29 @@ const fetchOrders = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Label>Quantity</Label>
-                  <Input type="text" value={orderFormData.quantity} onChange={e => setOrderFormData({ ...orderFormData, quantity: e.target.value })} />
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Quantity</Label>
+                      <Input type="text" value={orderFormData.quantity} onChange={e => setOrderFormData({ ...orderFormData, quantity: e.target.value })} />
+                    </div>
+
+                    <div>
+                      <Label>Unit</Label>
+                      <Select value={orderFormData.unit} onValueChange={val => setOrderFormData({ ...orderFormData, unit: val })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {UNITS.map(u => (
+                            <SelectItem key={u} value={u}>
+                              {u}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -372,7 +400,7 @@ const fetchOrders = () => {
                     </Button>
                   </div>
                   {orderFormData.bulkItems.map((item, idx) => (
-                    <div key={idx} className="flex gap-3 p-3 border rounded-lg">
+                    <div key={idx} className="grid grid-cols-4 gap-3 p-3 border rounded-lg">
                       <Select value={item.itemId} onValueChange={val => updateBulkItem(idx, 'itemId', val)}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select item" />
@@ -387,6 +415,20 @@ const fetchOrders = () => {
                       </Select>
 
                       <Input placeholder="Quantity" value={item.quantity} onChange={e => updateBulkItem(idx, 'quantity', e.target.value)} />
+
+                      <Select value={item.unit || ''} onValueChange={val => updateBulkItem(idx, 'unit', val)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {UNITS.map(u => (
+                            <SelectItem key={u} value={u}>
+                              {u}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
                       {orderFormData.bulkItems.length > 1 && (
                         <Button size="sm" variant="outline" className="text-red-600" onClick={() => removeBulkItem(idx)}>
                           <X className="w-3 h-3" />
@@ -439,15 +481,17 @@ const fetchOrders = () => {
                   <TableCell>{order.id}</TableCell>
                   <TableCell>{order.vendorName}</TableCell>
                   <TableCell>
-                     {(() => {
-                     const d = new Date(order.date);
-                     return d.toLocaleDateString('en-GB', {
-                     day: '2-digit',
-                     month: 'short',
-                     year: 'numeric'
-                     }).replace(/ /g, '-'); // Example: 19-Sep-2025
-                     })()}
-                   </TableCell>
+                    {(() => {
+                      const d = new Date(order.date);
+                      return d
+                        .toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric'
+                        })
+                        .replace(/ /g, '-');
+                    })()}
+                  </TableCell>
 
                   <TableCell>{order.items?.length}</TableCell>
                   <TableCell>
@@ -479,42 +523,43 @@ const fetchOrders = () => {
           {viewingOrder && (
             <div className="space-y-4">
               <div className="text-sm text-muted-foreground">
-                Order ID: {viewingOrder.id} | Vendor: {viewingOrder.vendorName} | Status: {viewingOrder.status}
+                <p>
+                  <strong>Vendor:</strong> {viewingOrder.vendorName}
+                </p>
+                <p>
+                  <strong>Date:</strong> {new Date(viewingOrder.date).toLocaleDateString()}
+                </p>
+                <p>
+                  <strong>Status:</strong> {viewingOrder.status}
+                </p>
+                <p>
+                  <strong>Notes:</strong> {viewingOrder.notes || '-'}
+                </p>
               </div>
-              <div>
-                <p className="font-semibold">Date:</p>
-                <p>{new Date(viewingOrder.date).toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="font-semibold">Notes:</p>
-                <p>{viewingOrder.notes || '-'}</p>
-              </div>
-              <div>
-                <p className="font-semibold">Items:</p>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Item</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Price</TableHead>
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Item</TableHead>
+                    <TableHead>Quantity</TableHead>
+                    <TableHead>Unit</TableHead>
+                    <TableHead>Price</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {viewingOrder.items?.map((item: any, idx: number) => (
+                    <TableRow key={idx}>
+                      <TableCell>{item.item || item.name || '-'}</TableCell>
+                      <TableCell>{item.quantity || '-'}</TableCell>
+                      <TableCell>{item.unit || '-'}</TableCell>
+                      <TableCell>{item.price ? '₹' + item.price : '-'}</TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {viewingOrder.items?.map((item: any, idx: number) => (
-                      <TableRow key={idx}>
-                        <TableCell>{item.item || item.name || '-'}</TableCell>
-                        <TableCell>{item.quantity || '-'}</TableCell>
-                        <TableCell>{item.price ? '₹' + item.price : '-'}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <div className="pt-2 font-semibold">Total Amount: {viewingOrder.totalAmount ? '₹' + viewingOrder.totalAmount : '-'}</div>
-              <div className="flex justify-end pt-4">
-                <Button variant="outline" onClick={() => setShowViewOrderDialog(false)}>
-                  Close
-                </Button>
+                  ))}
+                </TableBody>
+              </Table>
+
+              <div className="flex justify-end">
+                <strong>Total: ₹{viewingOrder.totalAmount}</strong>
               </div>
             </div>
           )}
@@ -523,39 +568,31 @@ const fetchOrders = () => {
 
       {/* Edit Order Dialog */}
       <Dialog open={showEditOrderDialog} onOpenChange={setShowEditOrderDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>Edit Order</DialogTitle>
-            <DialogDescription>Update the prices or complete the order</DialogDescription>
+            <DialogDescription>Update item prices</DialogDescription>
           </DialogHeader>
           {editingOrder && (
             <div className="space-y-4">
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <Label className="text-sm text-muted-foreground">Vendor</Label>
-                <p>{editingOrder.vendorName}</p>
-              </div>
-              <Label className="text-sm text-muted-foreground">Update Items</Label>
-              <div className="space-y-3">
-                {editFormData.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-3 gap-3 items-center">
-                    <p className="font-mono">{item.item}</p>
-                    <Input
-                      placeholder="Price"
-                      type="number"
-                      value={item.price}
-                      onChange={e => {
-                        const updated = [...editFormData];
-                        updated[idx].price = e.target.value;
-                        setEditFormData(updated);
-                      }}
-                    />
-                    <span className="text-sm text-muted-foreground">
-                      Qty: {editingOrder.items[idx].quantity}
-                    </span>
+              {editFormData.map((item, idx) => (
+                <div key={idx} className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Item</Label>
+                    <Input value={item.item} disabled />
                   </div>
-                ))}
-              </div>
-              <div className="flex justify-end gap-2 pt-4">
+                  <div>
+                    <Label>Price</Label>
+                    <Input value={item.price} onChange={e => {
+                      const newData = [...editFormData];
+                      newData[idx].price = e.target.value;
+                      setEditFormData(newData);
+                    }} />
+                  </div>
+                </div>
+              ))}
+
+              <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setShowEditOrderDialog(false)}>
                   Cancel
                 </Button>
@@ -568,5 +605,3 @@ const fetchOrders = () => {
     </div>
   );
 }
-
-export default OrdersModule;

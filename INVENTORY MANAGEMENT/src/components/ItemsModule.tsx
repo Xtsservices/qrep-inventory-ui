@@ -18,7 +18,7 @@ import { Plus, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 // 👇 Use your backend URL here
-const API_URL = 'http://172.16.4.40:9000/api/items';
+const API_URL = 'http://172.16.4.139:9000/api/items';
 
 export function ItemsModule() {
   const [items, setItems] = useState([]);
