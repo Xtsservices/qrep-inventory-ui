@@ -11,7 +11,7 @@ import { Badge } from './ui/badge';
 import { Plus, TrendingUp, TrendingDown, DollarSign, CreditCard, IndianRupee } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { toast } from 'sonner';
-import axios from 'axios';
+import { financeApi } from '../api/api';
 
 
 export function FinanceModule() {
@@ -28,69 +28,63 @@ export function FinanceModule() {
  
 
   // Fetch transactions from API
-// Fetch transactions from API
-const fetchTransactions = async () => {
-  try {
-    const res = await axios.get('http://172.16.4.56:9000/api/billings');
-
-    if (res.data.success) {
-      const formattedTransactions = res.data.data.map(txn => {
-        // Ensure amount is numeric
-        const amount = txn.total !== null && txn.total !== undefined ? Number(txn.total) : 0;
-
-        // Correctly determine status
-        let status = 'Pending';
-        if (txn.billing_status) {
-          status = txn.billing_status === 'Paid' ? 'Paid' : 'Pending';
-        } else if (txn.status) {
-          status = txn.status === 'Paid' ? 'Paid' : 'Pending';
-        }
-
-        // Format date safely
-        const order_date = txn.order_date ? new Date(txn.order_date).toISOString() : null;
-
-        return {
+  const fetchTransactions = async () => {
+    try {
+      const res = await financeApi.getAll();
+      if (res.success) {
+        const formattedTransactions = res.data.map(txn => ({
           id: `TXN${txn.billing_id}`,
-          order_date,
+          order_date: txn.order_date ? new Date(txn.order_date).toISOString() : null,
           vendor_name: txn.vendor_name || 'N/A',
           items: txn.item_name ? [txn.item_name] : [],
-          amount,
-          status,
+          amount: Number(txn.total || 0),
+          
+  status:
+    txn.status === "Paid"
+      ? "Completed" // 👈 convert Paid → Completed
+      : txn.order_status
+      ? txn.order_status
+      : txn.status,
           notes: txn.notes || ''
-        };
-      });
-
-      setTransactions(formattedTransactions);
+        }));
+        setTransactions(formattedTransactions);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load transactions');
     }
-  } catch (err) {
-    console.error('Error fetching transactions:', err);
-    toast.error('Failed to load transactions');
-  }
-};
-
-
+  };
 
   useEffect(() => {
     fetchTransactions();
   }, []);
 
+
   // Calculate summary
-  const calculateFinancialSummary = () => {
-const totalPurchases = transactions.reduce((sum, txn) => sum + Number(txn.amount || 0), 0);
-const totalConsumption = totalPurchases * 0.85;
-const outstandingPayments = transactions
-  .filter(txn => txn.status === 'Pending')
-  .reduce((sum, txn) => sum + Number(txn.amount || 0), 0);
+// Calculate summary
+const calculateFinancialSummary = () => {
+  const totalPurchases = transactions.reduce(
+    (sum, txn) => sum + Number(txn.amount || 0),
+    0
+  );
+  const totalConsumption = totalPurchases * 0.85;
+  const outstandingPayments = transactions
+    .filter((txn) => txn.status === "Pending")
+    .reduce((sum, txn) => sum + Number(txn.amount || 0), 0);
 
-
-    return {
-      totalPurchases,
-      totalConsumption,
-      outstandingPayments,
-      paidTransactions: transactions.filter(txn => txn.status === 'Paid').length,
-      pendingTransactions: transactions.filter(txn => txn.status === 'Pending').length
-    };
+  return {
+    totalPurchases,
+    totalConsumption,
+    outstandingPayments,
+    completedTransactions: transactions.filter(
+      (txn) => txn.status === "Completed"
+    ).length, // ✅ use Completed
+    pendingTransactions: transactions.filter(
+      (txn) => txn.status === "Pending"
+    ).length,
   };
+};
+
 
   // Aggregate vendor expenses dynamically
 
@@ -167,10 +161,11 @@ const vendorExpenseData = transactions.reduce((acc: any[], txn: any) => {
             <Badge variant="outline">{transactions.length}</Badge>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary.paidTransactions}</div>
-            <p className="text-xs text-muted-foreground">
-              Completed payments
-            </p>
+            <div className="text-2xl font-bold">{summary.completedTransactions}</div>
+<p className="text-xs text-muted-foreground">
+  Completed payments
+</p>
+
           </CardContent>
         </Card>
       </div>
@@ -222,7 +217,7 @@ const vendorExpenseData = transactions.reduce((acc: any[], txn: any) => {
         animationDuration={1200}
         animationEasing="ease-out"
       >
-        {vendorExpenseData.map((entry, index) => (
+        {vendorExpenseData?.map((entry, index) => (
           <Cell key={`cell-${index}`} fill={entry.color} />
         ))}
       </Pie>
@@ -259,7 +254,7 @@ const vendorExpenseData = transactions.reduce((acc: any[], txn: any) => {
 
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody className="text-center">
               {transactions.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
@@ -289,7 +284,7 @@ const vendorExpenseData = transactions.reduce((acc: any[], txn: any) => {
                     <TableCell>{transaction.vendor_name}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {transaction.items.map((item, index) => (
+                        {transaction?.items?.map((item, index) => (
                           <Badge key={index} variant="secondary" className="text-xs">
                             {item}
                           </Badge>
@@ -298,9 +293,12 @@ const vendorExpenseData = transactions.reduce((acc: any[], txn: any) => {
                     </TableCell>
                     <TableCell>₹{transaction.amount.toLocaleString()}</TableCell>
                     <TableCell>
-                     <Badge variant={transaction.status === 'Paid' ? 'default' : 'destructive'}>
+     <Badge
+  variant={transaction.status === "Completed" ? "default" : "destructive"}
+>
   {transaction.status}
 </Badge>
+
 
                     </TableCell>
                   </TableRow>
@@ -315,7 +313,8 @@ const vendorExpenseData = transactions.reduce((acc: any[], txn: any) => {
               Showing <span className="font-medium text-foreground">{transactions.length}</span> total transactions
             </div>
             <div className="flex gap-4">
-              <span>Paid: <span className="font-medium text-green-600">{summary.paidTransactions}</span></span>
+             <span>Completed: <span className="font-medium text-green-600">{summary.completedTransactions}</span></span>
+
               <span>Pending: <span className="font-medium text-red-600">{summary.pendingTransactions}</span></span>
               <span>Total Value: <span className="font-medium text-foreground">₹{summary.totalPurchases.toLocaleString()}</span></span>
             </div>

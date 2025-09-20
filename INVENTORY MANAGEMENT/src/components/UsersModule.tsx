@@ -20,6 +20,7 @@ import {
 } from './ui/alert-dialog';
 import { Plus, Eye, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { usersApi} from '../api/api';
 
 const roles = ['Admin', 'Manager', 'Staff'];
 const statuses = ['Active', 'Inactive'];
@@ -36,123 +37,114 @@ export function UsersModule() {
   const [userFormData, setUserFormData] = useState({ name: '', mobileNumber: '', email: '', role: '', status: 'Active' });
   const [editFormData, setEditFormData] = useState({ name: '', mobileNumber: '', email: '', role: '', status: 'Active' });
 
-  const API_BASE = 'http://172.16.4.56:9000/api/users';
+// Fetch Users
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
-  useEffect(() => { fetchUsers(); }, []);
-
+  /** Fetch all users */
   const fetchUsers = async () => {
     try {
-      const res = await axios.get(API_BASE);
-      if (res.data.success) {
-        setUsers(res.data.data); // backend should already send status: 'Active'|'Inactive'
-      }
+      const res = await usersApi.getAll();
+      if (res.success) setUsers(res.data);
     } catch (err) {
       console.error(err);
-      toast.error('Failed to fetch users');
+      toast.error("Failed to fetch users");
     }
   };
 
+  /** Validate form data */
   const validateForm = (data: any) => {
+    const newErrors: any = {};
     let valid = true;
-    let newErrors = { name: '', mobileNumber: '', email: '', role: '' };
 
-    if (!data.name.trim()) {
-      newErrors.name = 'Please enter user name'; valid = false;
-    } else if (!/^[A-Za-z\s]{2,50}$/.test(data.name.trim())) {
-      newErrors.name = 'Name should contain only letters and spaces'; valid = false;
-    }
+    if (!data.name.trim()) { newErrors.name = "Please enter user name"; valid = false; }
+    else if (!/^[A-Za-z\s]{2,50}$/.test(data.name.trim())) { newErrors.name = "Name must contain only letters and spaces"; valid = false; }
 
-    if (!data.mobileNumber.trim()) {
-      newErrors.mobileNumber = 'Please enter mobile number'; valid = false;
-    } else if (!/^\d{10}$/.test(data.mobileNumber)) {
-      newErrors.mobileNumber = 'Please enter a valid 10-digit mobile number'; valid = false;
-    }
+    if (!data.mobileNumber.trim()) { newErrors.mobileNumber = "Please enter mobile number"; valid = false; }
+    else if (!/^\d{10}$/.test(data.mobileNumber)) { newErrors.mobileNumber = "Mobile number must be 10 digits"; valid = false; }
 
-    if (!data.email.trim()) {
-      newErrors.email = 'Please enter email address'; valid = false;
-    } else if (!/\S+@\S+\.\S+/.test(data.email)) {
-      newErrors.email = 'Please enter a valid email address'; valid = false;
-    }
+    if (!data.email.trim()) { newErrors.email = "Please enter email"; valid = false; }
+    else if (!/\S+@\S+\.\S+/.test(data.email)) { newErrors.email = "Invalid email address"; valid = false; }
 
-    if (!data.role) { newErrors.role = 'Please select a role'; valid = false; }
+    if (!data.role) { newErrors.role = "Please select a role"; valid = false; }
 
-    // Frontend duplicate check
+    // Frontend duplicates check
     const isDuplicateNumber = users.some(u => u.mobileNumber === data.mobileNumber && u.id !== data.id);
     const isDuplicateEmail = users.some(u => u.email === data.email && u.id !== data.id);
-    if (isDuplicateNumber) { newErrors.mobileNumber = 'Mobile number already exists'; valid = false; }
-    if (isDuplicateEmail) { newErrors.email = 'Email address already exists'; valid = false; }
+    if (isDuplicateNumber) { newErrors.mobileNumber = "Mobile number already exists"; valid = false; }
+    if (isDuplicateEmail) { newErrors.email = "Email already exists"; valid = false; }
 
     setErrors(newErrors);
     return valid;
   };
 
-  const resetForm = () => setUserFormData({ name: '', mobileNumber: '', email: '', role: '', status: 'Active' });
+  const resetForm = () => setUserFormData({ name: "", mobileNumber: "", email: "", role: "", status: "Active" });
 
-  // Add User
+  /** Add user */
   const handleAddUser = async () => {
     if (!validateForm(userFormData)) return;
     try {
-      const res = await axios.post(API_BASE, userFormData);
-      if (res.data.success) {
-        toast.success('User added successfully');
+      const res = await usersApi.add(userFormData);
+      if (res.success) {
+        toast.success("User added successfully");
         fetchUsers();
         resetForm();
         setShowAddDialog(false);
-      } else { toast.error(res.data.error || 'Failed to add user'); }
+      }
     } catch (err: any) {
       console.error(err);
-      toast.error(err.response?.data?.error || 'Failed to add user');
+      toast.error(err.message || "Failed to add user");
     }
   };
 
-  // View User
-  const handleViewUser = async (userId: string) => {
-    try {
-      const res = await axios.get(`${API_BASE}/${userId}`);
-      if (res.data.success) {
-        setViewingUser(res.data.data);
-        setShowViewDialog(true);
-      } else { toast.error('User not found'); }
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to fetch user details');
-    }
-  };
-
-  // Edit User
+  /** Update user */
   const handleUpdateUser = async () => {
-    if (!editingUser) { toast.error('No user selected'); return; }
+    if (!editingUser) { toast.error("No user selected"); return; }
     if (!validateForm(editFormData)) return;
     try {
-      const res = await axios.put(`${API_BASE}/${editingUser.id}`, editFormData);
-      if (res.data.success) {
-        toast.success('User updated successfully');
+      const res = await usersApi.update(editingUser.id, editFormData);
+      if (res.success) {
+        toast.success("User updated successfully");
         fetchUsers();
         setShowEditDialog(false);
-      } else { toast.error(res.data.error || 'Failed to update user'); }
+      }
     } catch (err: any) {
       console.error(err);
-      toast.error(err.response?.data?.error || 'Failed to update user');
+      toast.error(err.message || "Failed to update user");
     }
   };
 
-  // Delete = Mark Inactive
+  /** Mark user inactive */
   const handleDeleteUser = async (userId: string) => {
     try {
-      const res = await axios.put(`${API_BASE}/${userId}`, { status: 'Inactive' });
-      if (res.data.success) {
-        toast.success('User marked as inactive');
+      const res = await usersApi.delete(userId);
+      if (res.success) {
+        toast.success("User marked as inactive");
         fetchUsers();
-      } else { toast.error(res.data.error || 'Failed to mark inactive'); }
+      }
     } catch (err: any) {
       console.error(err);
-      toast.error(err.response?.data?.error || 'Failed to mark inactive');
+      toast.error(err.message || "Failed to mark inactive");
     }
   };
 
-  const getRoleBadgeVariant = (role: string) => 
-    role === 'Admin' ? 'destructive' : role === 'Manager' ? 'default' : 'secondary';
-  const getStatusBadgeVariant = (status: string) => status === 'Active' ? 'success' : 'destructive';
+  /** View user */
+  const handleViewUser = async (userId: string) => {
+    try {
+      const res = await usersApi.getById(userId);
+      if (res.success) {
+        setViewingUser(res.data);
+        setShowViewDialog(true);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to fetch user details");
+    }
+  };
+
+  const getRoleBadgeVariant = (role: string) => role === "Admin" ? "destructive" : role === "Manager" ? "default" : "secondary";
+  const getStatusBadgeVariant = (status: string) => status === "Active" ? "success" : "destructive";
 
   return (
     <div className="space-y-6">
@@ -174,13 +166,13 @@ export function UsersModule() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>S. No.</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Mobile Number</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="text-center">S. No.</TableHead>
+                <TableHead className="text-center">Name</TableHead>
+                <TableHead className="text-center">Role</TableHead>
+                <TableHead className="text-center">Mobile Number</TableHead>
+                <TableHead className="text-center">Email</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
           <TableBody>
@@ -188,8 +180,8 @@ export function UsersModule() {
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No users found</TableCell>
                 </TableRow>
-              ) : users.map((user,index) => (
-                <TableRow key={user.id}>
+              ) : users?.map((user,index) => (
+                <TableRow key={user.id} className="text-center">
                   <TableCell>{index + 1}</TableCell>
                   <TableCell>{user.name}</TableCell>
                   <TableCell><Badge variant={getRoleBadgeVariant(user.role)}>{user.role}</Badge></TableCell>
@@ -197,7 +189,7 @@ export function UsersModule() {
                   <TableCell>{user.email}</TableCell>
                   <TableCell><Badge variant={getStatusBadgeVariant(user.status)}>{user.status}</Badge></TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 justify-center">
                       <Button variant="ghost" size="sm" onClick={() => handleViewUser(user.id)}>
                         <Eye className="w-4 h-4" />
                       </Button>

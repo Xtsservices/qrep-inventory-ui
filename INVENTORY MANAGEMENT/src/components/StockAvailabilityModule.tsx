@@ -1,90 +1,99 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Input } from './ui/input';
-import { Search } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { stocksApi } from "../api/api"; // adjust import path based on your project
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Badge } from "./ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Input } from "./ui/input";
+import { Search } from "lucide-react";
 
 export function StockAvailabilityModule() {
-  const [stock, setStock] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('all');
-    
-  const API_URL = "http://172.16.4.56:9000/api";
-  // Fetch stock data from API
-useEffect(() => {
-  axios.get(`${API_URL}/stocks`)
-    .then(res => {
-      console.log("Stock API response:", res.data); // 👈 check field names
-      if (res.data.success) {
-        const transformed = res.data.data.map(item => {
-          const quantity = item.current_stock != null && !isNaN(item.current_stock) 
-            ? Number(item.current_stock) 
-            : 0;   // 👈 change "quantity" to match backend
-          
-          const minThreshold = item.min_threshold != null && !isNaN(item.min_threshold) 
-            ? Number(item.min_threshold) 
-            : 0;
+  const [stock, setStock] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState("all");
 
-          let status = 'Unavailable';
-          if (quantity > 0 && quantity > minThreshold) status = 'Available';
-          else if (quantity > 0 && quantity <= minThreshold) status = 'Low Stock';
+  // ✅ Fetch stock data
+  useEffect(() => {
+    stocksApi
+      .getAll()
+      .then((res: any) => {
+        console.log("Stock API response:", res);
+        if (res.success) {
+          const transformed = res.data.map((item: any) => {
+            const quantity =
+              item.current_stock != null && !isNaN(item.current_stock)
+                ? Number(item.current_stock)
+                : 0;
 
-          return {
-            id: item.stock_id,
-            itemName: item.item_name,
-            quantity,
-            unit: item.unit || '-',
-            minThreshold,
-            status
-          };
-        });
+            const minThreshold =
+              item.min_threshold != null && !isNaN(item.min_threshold)
+                ? Number(item.min_threshold)
+                : 0;
 
-        setStock(transformed);
-      }
-    })
-    .catch(err => console.error('Error fetching stock:', err));
-}, []);
+            let status = "Unavailable";
+            if (quantity > 0 && quantity > minThreshold) status = "Available";
+            else if (quantity > 0 && quantity <= minThreshold) status = "Low Stock";
 
+            return {
+              id: item.stock_id,
+              itemName: item.item_name,
+              quantity,
+              unit: item.unit || "-",
+              minThreshold,
+              status,
+            };
+          });
 
+          setStock(transformed);
+        }
+      })
+      .catch((err) => console.error("Error fetching stock:", err));
+  }, []);
 
-  // Badge variant based on status
-  const getStatusVariant = (status) => {
+  // ✅ Badge variants
+  const getStatusVariant = (status: string) => {
     switch (status) {
-      case 'Available': return 'default';
-      case 'Low Stock': return 'destructive';
-      case 'Unavailable': return 'secondary';
-      default: return 'secondary';
+      case "Available":
+        return "default";
+      case "Low Stock":
+        return "destructive";
+      case "Unavailable":
+        return "secondary";
+      default:
+        return "secondary";
     }
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Available': return 'text-green-600';
-      case 'Low Stock': return 'text-orange-600';
-      case 'Unavailable': return 'text-red-600';
-      default: return 'text-gray-600';
+      case "Available":
+        return "text-green-600";
+      case "Low Stock":
+        return "text-orange-600";
+      case "Unavailable":
+        return "text-red-600";
+      default:
+        return "text-gray-600";
     }
   };
 
-  // Filter by search + tab
-  const filteredStock = stock.filter(item => {
+  // ✅ Filter by search + tab
+  const filteredStock = stock.filter((item) => {
     const matchesSearch = item.itemName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTab = activeTab === 'all' ||
-      (activeTab === 'available' && item.status === 'Available') ||
-      (activeTab === 'unavailable' && item.status === 'Unavailable') ||
-      (activeTab === 'low-stock' && item.status === 'Low Stock');
+    const matchesTab =
+      activeTab === "all" ||
+      (activeTab === "available" && item.status === "Available") ||
+      (activeTab === "unavailable" && item.status === "Unavailable") ||
+      (activeTab === "low-stock" && item.status === "Low Stock");
     return matchesSearch && matchesTab;
   });
 
-  // Summary counts
+  // ✅ Summary counts
   const stockSummary = {
-    available: stock.filter(item => item.status === 'Available').length,
-    unavailable: stock.filter(item => item.status === 'Unavailable').length,
-    lowStock: stock.filter(item => item.status === 'Low Stock').length,
-    total: stock.length
+    available: stock.filter((item) => item.status === "Available").length,
+    unavailable: stock.filter((item) => item.status === "Unavailable").length,
+    lowStock: stock.filter((item) => item.status === "Low Stock").length,
+    total: stock.length,
   };
 
   return (
@@ -160,16 +169,16 @@ useEffect(() => {
             <TabsContent value={activeTab} className="mt-4">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Item Name</TableHead>
-                    <TableHead>Current Stock</TableHead>
-                    <TableHead>Unit</TableHead>
-                    <TableHead>Min Threshold</TableHead>
-                    <TableHead>Status</TableHead>
+                  <TableRow >
+                    <TableHead className="text-center">Item Name</TableHead>
+                    <TableHead className="text-center">Current Stock</TableHead>
+                    <TableHead className="text-center">Unit</TableHead>
+                    <TableHead className="text-center">Min Threshold</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {filteredStock.map((item) => (
+                <TableBody className="text-center">
+                  {filteredStock?.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">{item.itemName}</TableCell>
                       <TableCell>

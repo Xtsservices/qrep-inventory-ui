@@ -1,19 +1,8 @@
 import React, { useState } from "react";
-import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "./ui/dropdown-menu";
-
-import { DashboardOverview } from "./DashboardOverview";
-import { ItemsModule } from "./ItemsModule";
-import { VendorsModule } from "./VendorsModule";
-import { OrdersModule } from "./OrdersModule";
-import { InventoryRequestModule } from "./InventoryRequestModule";
-import { StockAvailabilityModule } from "./StockAvailabilityModule";
-import { UsersModule } from "./UsersModule";
-import { FinanceModule } from "./FinanceModule";
-import { ProfileScreen } from "./ProfileScreen";
-
 import { 
   LayoutDashboard, Package, Users, ShoppingCart, ClipboardList, 
   Warehouse, UserCheck, IndianRupee, User, LogOut, ChevronLeft, ChevronRight 
@@ -30,19 +19,20 @@ const navigation = [
   { name: "Finance", icon: IndianRupee, key: "finance" },
 ];
 
-export function Dashboard({ currentUser, onLogout, onUpdateUser }) {
+export function Dashboard({ currentUser, onLogout, onUpdateUser, children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-const pathSegments = location.pathname.split("/").filter(Boolean);
-// ["dashboard", "items"] for /dashboard/items
-const activeModule = pathSegments[1] || "overview";
-
+  const pathSegments = location.pathname.split("/").filter(Boolean);
+  const activeModule = pathSegments[1] || "overview";
 
   const handleMenuClick = (key) => navigate(`/dashboard/${key}`);
   const handleProfileClick = () => navigate(`/dashboard/profile`);
   const handleUpdateProfile = (updatedUser) => onUpdateUser(updatedUser);
+
+    const activePageName =
+    navigation.find((item) => item.key === activeModule)?.name || "Dashboard";
 
   return (
     <div className="h-screen bg-background flex flex-col">
@@ -141,32 +131,17 @@ const activeModule = pathSegments[1] || "overview";
         </aside>
 
         {/* Main Content */}
-        <main className={`flex-1 overflow-y-auto transition-all duration-300 ${sidebarCollapsed ? "ml-16" : "ml-64"}`}>
+           <main
+          className={`flex-1 overflow-y-auto transition-all duration-300 ${
+            sidebarCollapsed ? "ml-16" : "ml-64"
+          }`}
+        >
           <div className="p-6">
-            <div className="mb-6">
-              <h1 className="text-2xl">
-                {activeModule === "profile"
-                  ? "Profile"
-                  : navigation.find((item) => item.key === activeModule)?.name || "Dashboard"}
-              </h1>
-            </div>
+            {/* Page Title */}
+            <h1 className="text-2xl font-bold mb-4">{activePageName}</h1>
 
-<Routes>
-  <Route index element={<Navigate to="overview" replace />} />
-  <Route path="overview" element={<DashboardOverview />} />
-  <Route path="items/*" element={<ItemsModule />} />
-  <Route path="vendors/*" element={<VendorsModule />} />
-  <Route path="orders/*" element={<OrdersModule />} />
-  <Route path="inventory-request/*" element={<InventoryRequestModule />} />
-  <Route path="stock-availability/*" element={<StockAvailabilityModule />} />
-  <Route path="users/*" element={<UsersModule />} />
-  <Route path="finance/*" element={<FinanceModule />} />
-  <Route path="profile" element={<ProfileScreen currentUser={currentUser} onUpdateProfile={handleUpdateProfile} />} />
-  <Route path="*" element={<Navigate to="overview" replace />} />
-</Routes>
-                  
-
-
+            {/* Rendered Page */}
+            {children}
           </div>
         </main>
       </div>
