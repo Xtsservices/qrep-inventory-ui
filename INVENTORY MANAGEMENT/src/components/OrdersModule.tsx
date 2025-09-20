@@ -3,36 +3,12 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from './ui/table';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from './ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogDescription
-} from './ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from './ui/select';
+
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from './ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+
 import { Badge } from './ui/badge';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Plus, Edit, Eye, X } from 'lucide-react';
@@ -42,13 +18,16 @@ const API_VENDORS = 'http://172.16.4.56:9000/api/vendors';
 const API_ITEMS = 'http://172.16.4.56:9000/api/items';
 const API_ORDERS = 'http://172.16.4.56:9000/api/orders';
 
+
+
+
 interface Vendor {
-  id: string;
+  id: string | number;
   name: string;
 }
 
 interface Item {
-  id: string;
+  id: string | number;
   name: string;
 }
 
@@ -89,6 +68,7 @@ export function OrdersModule() {
     quantity: '',
     notes: ''
   });
+
 
   const [editFormData, setEditFormData] = useState<EditItemData[]>([]);
 
@@ -232,11 +212,13 @@ const fetchOrders = () => {
   const handleEditOrder = (order: any) => {
     setEditingOrder(order);
     setEditFormData(order.items.map((item: any) => ({ item: item.item || item.name, price: item.price || '' })));
+
     setShowEditOrderDialog(true);
   };
 
   const handleUpdateOrder = async () => {
     if (!editingOrder) return;
+
 
     const totalAmount = editFormData.reduce((sum, item) => sum + (parseFloat(item.price) || 0), 0);
     const updatedItems = editFormData.map(i => ({
@@ -253,6 +235,7 @@ const fetchOrders = () => {
       date: new Date()
     };
 
+
     try {
       const res = await fetch(`${API_ORDERS}/${editingOrder.id}`, {
         method: 'PUT',
@@ -268,13 +251,15 @@ const fetchOrders = () => {
       console.error(err);
       toast.error('Failed to update order');
     }
-  };
+  };                                                    
+ 
 
   // View order
   const handleViewOrder = (order: any) => {
     setViewingOrder(order);
     setShowViewOrderDialog(true);
   };
+
 
   const addBulkItem = () =>
     setOrderFormData({
@@ -293,15 +278,13 @@ const fetchOrders = () => {
 
   return (
     <div className="space-y-6">
+
       {/* Header & Place Order Dialog */}
       <div className="flex justify-between items-center">
         <p className="text-muted-foreground">Manage vendor orders</p>
         <Dialog open={showPlaceOrderDialog} onOpenChange={setShowPlaceOrderDialog}>
           <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Place Order
-            </Button>
+            <Button><Plus className="w-4 h-4 mr-2" />Place Order</Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -312,7 +295,9 @@ const fetchOrders = () => {
               {/* Order Type */}
               <div className="space-y-3">
                 <Label>Order Type</Label>
+
                 <RadioGroup value={orderFormData.orderType} onValueChange={val => setOrderFormData({ ...orderFormData, orderType: val as any })}>
+
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="single" id="single" />
                     <Label htmlFor="single">Single Item</Label>
@@ -327,6 +312,7 @@ const fetchOrders = () => {
               {/* Vendor */}
               <div className="space-y-2">
                 <Label>Vendor *</Label>
+
                 <Select value={orderFormData.vendorId} onValueChange={val => setOrderFormData({ ...orderFormData, vendorId: val })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select vendor">
@@ -341,12 +327,14 @@ const fetchOrders = () => {
                     ))}
                   </SelectContent>
                 </Select>
+
               </div>
 
               {/* Items */}
               {orderFormData.orderType === 'single' ? (
                 <div className="space-y-2">
                   <Label>Select Item *</Label>
+
                   <Select value={orderFormData.singleItemId} onValueChange={val => setOrderFormData({ ...orderFormData, singleItemId: val })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select item" />
@@ -361,11 +349,13 @@ const fetchOrders = () => {
                   </Select>
                   <Label>Quantity</Label>
                   <Input type="text" value={orderFormData.quantity} onChange={e => setOrderFormData({ ...orderFormData, quantity: e.target.value })} />
+
                 </div>
               ) : (
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <Label>Items with Quantities *</Label>
+
                     <Button size="sm" variant="outline" onClick={addBulkItem}>
                       <Plus className="w-3 h-3 mr-1" />
                       Add Item
@@ -400,6 +390,7 @@ const fetchOrders = () => {
               {/* Notes */}
               <div className="space-y-2">
                 <Label>Notes</Label>
+
                 <Textarea value={orderFormData.notes} onChange={e => setOrderFormData({ ...orderFormData, notes: e.target.value })} />
               </div>
 
@@ -407,6 +398,7 @@ const fetchOrders = () => {
                 <Button variant="outline" onClick={() => setShowPlaceOrderDialog(false)}>
                   Cancel
                 </Button>
+
                 <Button onClick={handlePlaceOrder}>Place Order</Button>
               </div>
             </div>
@@ -438,6 +430,7 @@ const fetchOrders = () => {
                 <TableRow key={order.id}>
                   <TableCell>{order.id}</TableCell>
                   <TableCell>{order.vendorName}</TableCell>
+
                   <TableCell>
                      {(() => {
                      const d = new Date(order.date);
@@ -461,6 +454,7 @@ const fetchOrders = () => {
                     <Button size="sm" variant="ghost" onClick={() => handleEditOrder(order)} disabled={order.status === 'Completed'}>
                       <Edit className="w-4 h-4" />
                     </Button>
+
                   </TableCell>
                 </TableRow>
               ))}
@@ -515,6 +509,7 @@ const fetchOrders = () => {
                 <Button variant="outline" onClick={() => setShowViewOrderDialog(false)}>
                   Close
                 </Button>
+
               </div>
             </div>
           )}
@@ -534,6 +529,7 @@ const fetchOrders = () => {
                 <Label className="text-sm text-muted-foreground">Vendor</Label>
                 <p>{editingOrder.vendorName}</p>
               </div>
+
               <Label className="text-sm text-muted-foreground">Update Items</Label>
               <div className="space-y-3">
                 {editFormData.map((item, idx) => (
@@ -542,11 +538,13 @@ const fetchOrders = () => {
                     <Input
                       placeholder="Price"
                       type="number"
+
                       value={item.price}
                       onChange={e => {
                         const updated = [...editFormData];
                         updated[idx].price = e.target.value;
                         setEditFormData(updated);
+
                       }}
                     />
                     <span className="text-sm text-muted-foreground">
@@ -556,9 +554,11 @@ const fetchOrders = () => {
                 ))}
               </div>
               <div className="flex justify-end gap-2 pt-4">
+
                 <Button variant="outline" onClick={() => setShowEditOrderDialog(false)}>
                   Cancel
                 </Button>
+
                 <Button onClick={handleUpdateOrder}>Update Order</Button>
               </div>
             </div>
@@ -569,4 +569,6 @@ const fetchOrders = () => {
   );
 }
 
+
 export default OrdersModule;
+
