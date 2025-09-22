@@ -6,9 +6,9 @@ import {
 } from 'recharts';
 import { Package, Users, AlertTriangle, TrendingUp } from 'lucide-react';
 
-const ITEMS_API_URL = 'http://172.16.4.139:9000/api/items';
-const VENDORS_API_URL = 'http://172.16.4.139:9000/api/vendors';
-const ORDERS_API_URL = 'http://172.16.4.139:9000/api/orders';
+const ITEMS_API_URL = 'http://172.16.4.22:9000/api/items';
+const VENDORS_API_URL = 'http://172.16.4.22:9000/api/vendors';
+const ORDERS_API_URL = 'http://172.16.4.22:9000/api/orders';
 
 export function DashboardOverview() {
   const [itemsCount, setItemsCount] = useState(0);

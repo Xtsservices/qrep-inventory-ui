@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // 🌍 Base URL
-const BASE_URL = "http://172.16.4.139:9000/api";
+const BASE_URL = "http://172.16.4.22:9000/api";
 
 // 🔹 Generic API request wrapper (only one!)
 const request = async (endpoint: string, method: string = "GET", body?: any) => {
@@ -49,9 +49,9 @@ export const usersApi = {
 
 // 🔹 Finance API
 export const financeApi = {
-  getAll: () => request("/billings"),
-  getById: (id: string) => request(`/billings/${id}`),
-  add: (payload: any) => request("/billings", "POST", payload),
-  update: (id: string, payload: any) => request(`/billings/${id}`, "PUT", payload),
-  delete: (id: string) => request(`/billings/${id}`, "DELETE"),
+  getAll: () => request("/billing"),
+  getById: (id: string) => request(`/billing/${id}`),
+  add: (payload: any) => request("/billing", "POST", payload),
+  update: (id: string, payload: any) => request(`/billing/${id}`, "PUT", payload),
+  delete: (id: string) => request(`/billing/${id}`, "DELETE"),
 };

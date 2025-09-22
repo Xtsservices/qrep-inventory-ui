@@ -181,20 +181,31 @@ export function ItemsModule() {
   // EDIT
   // -----------------------------
   const handleEdit = (item) => {
-    const normalizedType = itemTypes.find(t => t.toLowerCase() === (item.type ?? '').toLowerCase().trim()) || '';
-    setEditingItem(item);
-    setFormData({
-      name: item.name ?? '',
-      type: normalizedType,
-      status_id: item.status_id?.toString() ?? '1',
-      units: item.units ?? '',
-      kg: item.kg ?? '',
-      grams: item.grams ?? '',
-      litres: item.litres ?? '',
-    });
-    setErrors({});
-    setShowDialog(true);
-  };
+  // 🚫 If item is inactive, show toast and stop
+  if (Number(item.status_id) === 2) {
+    toast.error(`Item "${item.name}" is already deleted (inactive).`);
+    return;
+  }
+
+  // ✅ Otherwise proceed to edit
+  const normalizedType = itemTypes.find(
+    t => t.toLowerCase() === (item.type ?? '').toLowerCase().trim()
+  ) || '';
+
+  setEditingItem(item);
+  setFormData({
+    name: item.name ?? '',
+    type: normalizedType,
+    status_id: item.status_id?.toString() ?? '1',
+    units: item.units ?? '',
+    kg: item.kg ?? '',
+    grams: item.grams ?? '',
+    litres: item.litres ?? '',
+  });
+  setErrors({});
+  setShowDialog(true);
+};
+
 
   // -----------------------------
   // DELETE (mark inactive)

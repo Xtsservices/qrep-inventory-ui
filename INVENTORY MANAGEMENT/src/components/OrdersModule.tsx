@@ -14,9 +14,9 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Plus, Edit, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-const API_VENDORS = 'http://172.16.4.139:9000/api/vendors';
-const API_ITEMS = 'http://172.16.4.139:9000/api/items';
-const API_ORDERS = 'http://172.16.4.139:9000/api/orders';
+const API_VENDORS = 'http://172.16.4.22:9000/api/vendors';
+const API_ITEMS = 'http://172.16.4.22:9000/api/items';
+const API_ORDERS = 'http://172.16.4.22:9000/api/orders';
 
 // Units for dropdown
 const UNITS = ['KG', 'Liters', 'Pieces', 'Box'];
@@ -119,10 +119,11 @@ export function OrdersModule() {
           id: o.order_id,
           vendorName: o.vendor_name,
           date: o.date,
-          items: o.items,
+          // items: o.items,
           status: o.status,
           totalAmount: o.total,
-          notes: o.notes || ''
+          notes: o.notes || '',
+          items: o.item_details ? JSON.parse(o.item_details) : [],
         }));
         setOrders(mapped);
       })
@@ -504,57 +505,86 @@ export function OrdersModule() {
       </Card>
 
       {/* View Order Dialog */}
-      <Dialog open={showViewOrderDialog} onOpenChange={setShowViewOrderDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>View Order</DialogTitle>
-            <DialogDescription>All details of this order</DialogDescription>
-          </DialogHeader>
-          {viewingOrder && (
-            <div className="space-y-4">
-              <div className="text-sm text-muted-foreground">
-                <p>
-                  <strong>Vendor:</strong> {viewingOrder.vendorName}
-                </p>
-                <p>
-                  <strong>Date:</strong> {new Date(viewingOrder.date).toLocaleDateString()}
-                </p>
-                <p>
-                  <strong>Status:</strong> {viewingOrder.status}
-                </p>
-                <p>
-                  <strong>Notes:</strong> {viewingOrder.notes || '-'}
-                </p>
-              </div>
+      {/* View Order Dialog */}
+<Dialog
+  open={showViewOrderDialog}
+  onOpenChange={(open) => {
+    setShowViewOrderDialog(open);
+    if (!open) setViewingOrder(null); // reset when closing
+  }}
+>
+  <DialogContent className="max-w-2xl">
+    <DialogHeader>
+      <DialogTitle>View Order</DialogTitle>
+      <DialogDescription>All details of this order</DialogDescription>
+    </DialogHeader>
 
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Unit</TableHead>
-                    <TableHead>Price</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {viewingOrder.items?.map((item: any, idx: number) => (
-                    <TableRow key={idx}>
-                      <TableCell>{item.item || item.name || '-'}</TableCell>
-                      <TableCell>{item.quantity || '-'}</TableCell>
-                      <TableCell>{item.unit || '-'}</TableCell>
-                      <TableCell>{item.price ? '₹' + item.price : '-'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+    {viewingOrder ? (
+      <div className="space-y-4">
+        {/* Order Meta */}
+        <div className="text-sm text-muted-foreground space-y-1">
+          <p>
+            <strong>Vendor:</strong> {viewingOrder.vendorName || viewingOrder.vendor_name || '-'}
+          </p>
+          <p>
+            <strong>Date:</strong>{' '}
+            {viewingOrder.date
+              ? new Date(viewingOrder.date).toLocaleDateString('en-GB', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric'
+                }).replace(/ /g, '-')
+              : '-'}
+          </p>
+          <p>
+            <strong>Status:</strong> {viewingOrder.status || '-'}
+          </p>
+          <p>
+            <strong>Notes:</strong> {viewingOrder.notes || '-'}
+          </p>
+        </div>
 
-              <div className="flex justify-end">
-                <strong>Total: ₹{viewingOrder.totalAmount}</strong>
-              </div>
-            </div>
+        {/* Items Table */}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Item</TableHead>
+              <TableHead>Quantity</TableHead>
+              <TableHead>Unit</TableHead>
+              <TableHead>Price</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.isArray(viewingOrder.items) && viewingOrder.items.length > 0 ? (
+            viewingOrder.items.map((item: any, idx: number) => (
+              <TableRow key={idx}>
+                <TableCell>{item.name || '-'}</TableCell>
+                <TableCell>{item.quantity ?? '-'}</TableCell>
+                <TableCell>{item.unit ?? '-'}</TableCell>
+                <TableCell>{item.price !== undefined ? '₹' + item.price : '-'}</TableCell>
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={4} className="text-center text-muted-foreground">
+                No items found
+              </TableCell>
+            </TableRow>
           )}
-        </DialogContent>
-      </Dialog>
+
+          </TableBody>
+        </Table>
+
+        {/* Total */}
+        <div className="flex justify-end font-semibold">
+          Total: ₹{viewingOrder.totalAmount ?? viewingOrder.total ?? '-'}
+        </div>
+      </div>
+    ) : (
+      <div className="text-center text-muted-foreground py-4">No order selected</div>
+    )}
+  </DialogContent>
+</Dialog>
 
       {/* Edit Order Dialog */}
       <Dialog open={showEditOrderDialog} onOpenChange={setShowEditOrderDialog}>

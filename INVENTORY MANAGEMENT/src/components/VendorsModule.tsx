@@ -30,7 +30,7 @@ import { toast } from "sonner";
 import axios from "axios";
 
 
-const API_URL = "http://172.16.4.139:9000/api/vendors";
+const API_URL = "http://172.16.4.22:9000/api/vendors";
 
 export function VendorsModule() {
   const [vendors, setVendors] = useState<any[]>([]);
