@@ -41,7 +41,7 @@ export function FinanceModule() {
           
   status:
     txn.status === "Paid"
-      ? "Completed" // 👈 convert Paid → Completed
+      ? "Completed"
       : txn.order_status
       ? txn.order_status
       : txn.status,
@@ -248,7 +248,7 @@ const vendorExpenseData = transactions.reduce((acc: any[], txn: any) => {
                 <TableHead className="text-center">Transaction ID</TableHead>
 <TableHead className="text-center">Date</TableHead>
 <TableHead className="text-center">Vendor</TableHead>
-<TableHead className="text-center">Item(s)</TableHead>
+<TableHead>Item(s)</TableHead>
 <TableHead className="text-center">Amount</TableHead>
 <TableHead className="text-center">Status</TableHead>
 
@@ -292,7 +292,7 @@ const vendorExpenseData = transactions.reduce((acc: any[], txn: any) => {
                       </div>
                     </TableCell>
                     <TableCell>₹{transaction.amount.toLocaleString()}</TableCell>
-                    <TableCell>
+                    <TableCell >
      <Badge
   variant={transaction.status === "Completed" ? "default" : "destructive"}
 >

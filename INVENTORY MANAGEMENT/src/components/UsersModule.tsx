@@ -59,7 +59,9 @@ export function UsersModule() {
     let valid = true;
 
     if (!data.name.trim()) { newErrors.name = "Please enter user name"; valid = false; }
-    else if (!/^[A-Za-z\s\.]{2,50}$/.test(data.name.trim())) { newErrors.name = "Name must contain only letters, spaces, and periods"; valid = false; }
+
+    else if (!/^[A-Za-z\.s]{2,50}$/.test(data.name.trim())) { newErrors.name = "Name must contain only letters and spaces"; valid = false; }
+
 
     if (!data.mobileNumber.trim()) { newErrors.mobileNumber = "Please enter mobile number"; valid = false; }
     else if (!/^\d{10}$/.test(data.mobileNumber)) { newErrors.mobileNumber = "Mobile number must be 10 digits"; valid = false; }

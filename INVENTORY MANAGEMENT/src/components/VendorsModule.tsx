@@ -27,10 +27,10 @@ import {
 } from "./ui/dialog";
 import { Plus, Eye, Trash } from "lucide-react";
 import { toast } from "sonner";
-import axios from "axios";
 
+import { vendorsApi } from "../api/api"; // <-- import the centralized API
+import { Badge } from "./ui/badge";
 
-const API_URL = "http://172.16.4.22:9000/api/vendors";
 
 export function VendorsModule() {
   const [vendors, setVendors] = useState<any[]>([]);
@@ -56,20 +56,20 @@ export function VendorsModule() {
     fetchVendors();
   }, []);
 
-  // ✅ Fetch vendors and remove duplicates by mobile_number
+  // Fetch vendors using vendorsApi
   const fetchVendors = async () => {
     try {
-      const res = await axios.get(API_URL);
-      const raw = res.data.data || [];
+      const res = await vendorsApi.getAll();
+      const raw = res.data || [];
 
+      // Remove duplicates by mobile_number
       const unique = raw.filter(
         (v: any, i: number, self: any[]) =>
           i === self.findIndex((x) => x.mobile_number === v.mobile_number)
       );
-
       setVendors(unique);
     } catch (error: any) {
-      console.error("Error fetching vendors:", error.response?.data || error.message);
+      console.error("Error fetching vendors:", error.message);
       toast.error("Failed to fetch vendors");
     }
   };
@@ -78,55 +78,39 @@ export function VendorsModule() {
   const validateForm = () => {
     const errors: any = {};
 
-    // Vendor Name
     if (!formData.vendor_name.trim()) errors.vendor_name = "Vendor Name is required";
 
-    // Mobile Number
     if (!formData.mobile_number.trim()) {
       errors.mobile_number = "Mobile Number is required";
     } else if (!/^[6-9]\d{9}$/.test(formData.mobile_number)) {
       errors.mobile_number = "Enter a valid 10-digit Indian mobile number";
     }
 
-    // License Number (Required)
-    if (!formData.license_number.trim()) {
-      errors.license_number = "License Number is required";
-    } else if (!/^[A-Z0-9\-\/]{3,20}$/.test(formData.license_number)) {
+    if (!formData.license_number.trim()) errors.license_number = "License Number is required";
+    else if (!/^[A-Z0-9\-\/]{3,20}$/.test(formData.license_number))
       errors.license_number = "Invalid License Number format";
-    }
 
-    // Contact Person
     if (!formData.contact_person.trim()) errors.contact_person = "Contact Person is required";
-     // Contact Mobile (now required)
-     if (!formData.contact_mobile.trim()) {
-       errors.contact_mobile = "Contact Mobile is required";
-       } else if (!/^[6-9]\d{9}$/.test(formData.contact_mobile)) {
-       errors.contact_mobile = "Enter a valid 10-digit Indian mobile number";
+
+    if (!formData.contact_mobile.trim()) {
+      errors.contact_mobile = "Contact Mobile is required";
+    } else if (!/^[6-9]\d{9}$/.test(formData.contact_mobile)) {
+      errors.contact_mobile = "Enter a valid 10-digit Indian mobile number";
     }
-    // Contact Email (optional)
-    if (!formData.contact_email.trim()) {
-    errors.contact_email = "Contact Email is required";
-  } else if (!/^\S+@\S+\.\S+$/.test(formData.contact_email)) {
-    errors.contact_email = "Invalid email format";
-  }
 
-    // GST Number (optional but validated if filled)
-    if (!formData.gst_number.trim()) {
-    errors.gst_number = "GST Number is required";
-  } else if (
-    !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(formData.gst_number)
-  ) {
-    errors.gst_number = "Invalid GST Number";
-  }
+    if (!formData.contact_email.trim()) errors.contact_email = "Contact Email is required";
+    else if (!/^\S+@\S+\.\S+$/.test(formData.contact_email)) errors.contact_email = "Invalid email format";
 
-    // PAN Number (optional but validated if filled)
-    if (!formData.pan_number.trim()) {
-    errors.pan_number = "PAN Number is required";
-  } else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.pan_number)) {
-    errors.pan_number = "Invalid PAN Number";
-  }
-   // Full Address (now required)
-  if (!formData.full_address.trim()) errors.full_address = "Full Address is required";
+    if (!formData.gst_number.trim()) errors.gst_number = "GST Number is required";
+    else if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(formData.gst_number))
+      errors.gst_number = "Invalid GST Number";
+
+    if (!formData.pan_number.trim()) errors.pan_number = "PAN Number is required";
+    else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.pan_number))
+      errors.pan_number = "Invalid PAN Number";
+
+    if (!formData.full_address.trim()) errors.full_address = "Full Address is required";
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -139,7 +123,6 @@ export function VendorsModule() {
       return;
     }
 
-    // ✅ Check duplicate mobile locally
     const duplicate = vendors.find((v) => v.mobile_number === formData.mobile_number);
     if (duplicate) {
       toast.error("Vendor with this mobile number already exists");
@@ -147,8 +130,7 @@ export function VendorsModule() {
     }
 
     try {
-      const payload = { ...formData, created_by: 1 };
-      await axios.post(API_URL, payload, { headers: { "Content-Type": "application/json" } });
+      await vendorsApi.add({ ...formData, created_by: 1 });
       toast.success("Vendor added successfully!");
       setFormData({
         vendor_name: "",
@@ -165,7 +147,7 @@ export function VendorsModule() {
       fetchVendors();
       setShowAddDialog(false);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to add vendor");
+      toast.error(error.message || "Failed to add vendor");
     }
   };
 
@@ -174,17 +156,16 @@ export function VendorsModule() {
     setShowViewDialog(true);
   };
 
-
   const handleDelete = async (vendor_id: string) => {
     if (!confirm("Are you sure you want to delete this vendor?")) return;
 
     try {
-      await axios.delete(`${API_URL}/${vendor_id}`);
+      await vendorsApi.delete(vendor_id);
       toast.success("Vendor deleted successfully!");
       fetchVendors();
     } catch (error: any) {
       console.error("Delete error:", error);
-      toast.error(error.response?.data?.message || "Failed to delete vendor");
+      toast.error(error.message || "Failed to delete vendor");
     }
   };
 
@@ -388,46 +369,53 @@ export function VendorsModule() {
                 <TableHead>Contact Person</TableHead>
                 <TableHead>GST</TableHead>
                 <TableHead>PAN</TableHead>
+                <TableHead>Status</TableHead> 
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {Array.isArray(vendors) && vendors.length > 0 ? (
-                vendors.map((vendor) => (
-                  <TableRow key={vendor.vendor_id}>
-                    <TableCell>{vendor.vendor_name}</TableCell>
-                    <TableCell>{vendor.mobile_number}</TableCell>
-                    <TableCell>{vendor.license_number}</TableCell>
-                    <TableCell>{vendor.contact_person}</TableCell>
-                    <TableCell>{vendor.gst_number}</TableCell>
-                    <TableCell>{vendor.pan_number}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleView(vendor)}
-                        className="mr-2"
-                      >
-                        <Eye className="w-4 h-4 mr-1" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(vendor.vendor_id)}
-                      >
-                        <Trash className="w-4 h-4 mr-1" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
-                    No vendors found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
+  {Array.isArray(vendors) && vendors.length > 0 ? (
+    vendors.map((vendor) => (
+      <TableRow key={vendor.vendor_id}>
+        <TableCell>{vendor.vendor_name}</TableCell>
+        <TableCell>{vendor.mobile_number}</TableCell>
+        <TableCell>{vendor.license_number}</TableCell>
+        <TableCell>{vendor.contact_person}</TableCell>
+        <TableCell>{vendor.gst_number}</TableCell>
+        <TableCell>{vendor.pan_number}</TableCell>
+        <TableCell>
+          <Badge variant={vendor.status === 1 || vendor.status === '1' ? 'success' : 'destructive'}>
+            {vendor.status === 1 || vendor.status === '1' ? 'Active' : 'Inactive'}
+          </Badge>
+        </TableCell>
+        <TableCell>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleView(vendor)}
+            className="mr-2"
+          >
+            <Eye className="w-4 h-4 mr-1" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDelete(vendor.vendor_id)}
+          >
+            <Trash className="w-4 h-4 mr-1" />
+          </Button>
+        </TableCell>
+      </TableRow>
+    ))
+  ) : (
+    <TableRow>
+      <TableCell colSpan={8} className="text-center text-muted-foreground">
+        No vendors found
+      </TableCell>
+    </TableRow>
+  )}
+</TableBody>
+
           </Table>
         </CardContent>
       </Card>
