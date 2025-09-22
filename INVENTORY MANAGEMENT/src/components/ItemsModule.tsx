@@ -4,30 +4,20 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
-
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { itemsApi } from "../api/api";
-
-// 👇 Use your backend URL here
-const API_URL = 'http://172.16.4.139:9000/api/items';
+import { itemsApi } from '../api/api';
 
 export function ItemsModule() {
   const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
-
   const [formData, setFormData] = useState({
     name: '',
     type: '',
@@ -37,7 +27,6 @@ export function ItemsModule() {
     grams: '',
     litres: '',
   });
-
   const [errors, setErrors] = useState({});
 
   const itemTypes = ['Grains', 'Pulses', 'Oil', 'Vegetables', 'Spices', 'Dairy', 'Others'];
@@ -45,37 +34,41 @@ export function ItemsModule() {
   // -----------------------------
   // FETCH ITEMS
   // -----------------------------
-  const fetchItems = async () => {
-    try {
+const fetchItems = async () => {
+  try {
+    setLoading(true);
+    const response = await itemsApi.getAll();
+    const rawItems = response?.data ?? [];
 
-      const data = await itemsApi.getAll();
-      const raw = Array.isArray(data) ? data : data.data || [];
+    console.log("API items:", rawItems); // <-- add this line
 
-      const normalizedItems = raw.map((item) => {
-        const db_id = (item.item_id ?? item.id ?? "").toString().trim();
-        let status_id = Number(item.status_id ?? 1);
-        if (![1, 2].includes(status_id)) status_id = 1;
+    const normalizedItems = rawItems.map((item) => {
+      const status_id = Number(item.status_id ?? 1);
+      return {
+        item_id: item.item_id ?? '',
+        name: item.name ?? item.item_name ?? item.itemName ?? 'Unknown', // check multiple keys
+        type: item.type ?? '', 
+        status_id,
+        status: status_id === 1 ? 'Active' : 'Inactive',
+        units: Number(item.units) || 0,
+        kg: Number(item.kg) || 0,
+        grams: Number(item.grams) || 0,
+        litres: Number(item.litres) || 0,
+      };
+    });
 
-        return {
-          item_id: db_id,
-          name: item.name ?? item.item_name ?? "",
-          type: item.type ?? item.item_type ?? "",
-          status_id,
-          status: status_id === 1 ? "Active" : "Inactive",
-          units: item.units ?? "",
-          grams: item.grams ?? "",
-          kg: item.kg ?? "",
-          litres: item.litres ?? "",
-        };
-      });
+    setItems(normalizedItems.reverse());
+  } catch (err) {
+    console.error("Fetch items error:", err);
+    toast.error("Error fetching items");
+  } finally {
+    setLoading(false);
+  }
+};
+  
 
-      setItems(normalizedItems.reverse());
 
-    } catch (err) {
-      console.error("Fetch items error:", err);
-      toast.error("Error fetching items");
-    }
-  };
+
 
   useEffect(() => { fetchItems(); }, []);
 
@@ -83,39 +76,32 @@ export function ItemsModule() {
   // FORM VALIDATION
   // -----------------------------
   const validateField = (name, value) => {
-    let error = "";
-
-    if (name === "name") {
-      if (!value.trim()) error = "Item name is required";
+    let error = '';
+    if (name === 'name') {
+      if (!value.trim()) error = 'Item name is required';
       else if (!/^[A-Za-z\s\-&()\.]+$/.test(value.trim()))
-        error = "Only alphabets and - & ( ) . are allowed";
+        error = 'Only alphabets and - & ( ) . are allowed';
     }
-
-    if (["units", "kg", "grams", "litres"].includes(name)) {
-      if (value && Number(value) < 0) error = "Value cannot be negative";
+    if (['units', 'kg', 'grams', 'litres'].includes(name)) {
+      if (value && Number(value) < 0) error = 'Value cannot be negative';
     }
-
-    if (name === "type" && !value.trim()) error = "Please select item type";
-
+    if (name === 'type' && !value.trim()) error = 'Please select item type';
     setErrors((prev) => ({ ...prev, [name]: error }));
-    return error === "";
+    return error === '';
   };
 
   const validateForm = () => {
-    const fields = ["name", "type", "units", "kg", "grams", "litres"];
+    const fields = ['name', 'type', 'units', 'kg', 'grams', 'litres'];
     let valid = true;
-
     fields.forEach((field) => {
-      const value = formData[field] || "";
+      const value = formData[field] || '';
       if (!validateField(field, value)) valid = false;
     });
 
-    // Ensure at least one quantity
     if (!formData.units && !formData.kg && !formData.grams && !formData.litres) {
-      setErrors((prev) => ({ ...prev, units: "Enter at least one quantity" }));
+      setErrors((prev) => ({ ...prev, units: 'Enter at least one quantity' }));
       valid = false;
     }
-
     return valid;
   };
 
@@ -126,90 +112,100 @@ export function ItemsModule() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     if (errors[e.target.name]) validateField(e.target.name, e.target.value);
   };
-
   const handleTypeChange = (value) => {
     setFormData({ ...formData, type: value });
-    if (errors.type) validateField("type", value);
+    if (errors.type) validateField('type', value);
   };
 
   // -----------------------------
   // ADD / EDIT SUBMIT
   // -----------------------------
-  const handleSubmit = async () => {
-    if (isSubmitting) return;
-    if (!validateForm()) return;
+const handleSubmit = async () => {
+  if (isSubmitting) return;
+  if (!validateForm()) return;
 
-    const nameTrimmed = formData.name.trim();
-    const typeTrimmed = formData.type.trim();
+  const itemNameTrimmed = formData.name.trim();
+  const typeTrimmed = formData.type.trim();
 
-    // Duplicate check for new items
-    if (!editingItem && items.some((i) => i.name.toLowerCase() === nameTrimmed.toLowerCase())) {
-      toast.error(`Item "${nameTrimmed}" already exists!`);
-      return;
-    }
+  // Prevent empty name
+  if (!itemNameTrimmed) {
+    toast.error("Item name is required");
+    return;
+  }
 
-    const payload = {
-      name: nameTrimmed,
-      type: typeTrimmed,
-      status_id: Number(formData.status_id || 1),
-      units: Number(formData.units) || 0,
-      kg: Number(formData.kg) || 0,
-      grams: Number(formData.grams) || 0,
-      litres: Number(formData.litres) || 0,
-    };
+  // Check duplicate locally
+  if (!editingItem && items.some(i => i.name.toLowerCase() === itemNameTrimmed.toLowerCase())) {
+    toast.error(`Item "${itemNameTrimmed}" already exists!`);
+    return;
+  }
 
-    if (editingItem) payload.item_id = editingItem.item_id;
-
-    setIsSubmitting(true);
-    try {
-      if (editingItem) {
-        await itemsApi.update(editingItem.item_id, payload);
-        toast.success("Item updated successfully!");
-      } else {
-        await itemsApi.add(payload);
-        toast.success("Item added successfully!");
-      }
-      await fetchItems();
-      handleCloseDialog();
-    } catch (err) {
-      console.error("Submit error:", err);
-      toast.error(err.message || "Something went wrong");
-    } finally { setIsSubmitting(false); }
+  // Prepare payload for backend
+  const payload = {
+    name: itemNameTrimmed,   // must always come from form input
+    type: typeTrimmed,       // dropdown selection
+    status_id: Number(formData.status_id || 1),
+    units: Number(formData.units) || 0,
+    kg: Number(formData.kg) || 0,
+    grams: Number(formData.grams) || 0,
+    litres: Number(formData.litres) || 0,
   };
+
+  if (editingItem) payload.item_id = editingItem.item_id;
+
+  setIsSubmitting(true);
+  try {
+    if (editingItem) {
+      await itemsApi.update(editingItem.item_id, payload);
+      toast.success("Item updated successfully!");
+    } else {
+      await itemsApi.add(payload);
+      toast.success("Item added successfully!");
+    }
+    await fetchItems();
+    handleCloseDialog();
+  } catch (err: any) {
+    console.error("Submit error:", err);
+    toast.error(err.response?.data?.error || err.message || "Something went wrong");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
+
 
   // -----------------------------
   // EDIT
   // -----------------------------
   const handleEdit = (item) => {
-    const normalizedType = itemTypes.find(t => t.toLowerCase() === (item.type ?? '').toLowerCase().trim()) || '';
+    const normalizedType =
+      itemTypes.find((t) => t.toLowerCase() === (item.type ?? '').toLowerCase().trim()) || '';
     setEditingItem(item);
-    setFormData({
-      name: item.name ?? '',
-      type: normalizedType,
-      status_id: item.status_id?.toString() ?? '1',
-      units: item.units ?? '',
-      kg: item.kg ?? '',
-      grams: item.grams ?? '',
-      litres: item.litres ?? '',
-    });
+  setFormData({
+  name: item.name ?? item.item_name ?? '', // <-- check both keys
+  type: normalizedType,
+  status_id: item.status_id?.toString() ?? '1',
+  units: item.units ?? '',
+  kg: item.kg ?? '',
+  grams: item.grams ?? '',
+  litres: item.litres ?? '',
+});
+
     setErrors({});
     setShowDialog(true);
   };
 
   // -----------------------------
-  // DELETE (mark inactive)
+  // DELETE (soft delete)
   // -----------------------------
   const handleDelete = async (item) => {
     if (!confirm(`Are you sure you want to mark "${item.name}" as Inactive?`)) return;
     try {
-
       await itemsApi.update(item.item_id, { ...item, status_id: 2 });
       toast.success(`Item "${item.name}" marked as Inactive!`);
       await fetchItems();
-
     } catch (err) {
-      console.error("Delete error:", err);
-      toast.error(err.message || "Failed to mark inactive");
+      console.error('Delete error:', err);
+      toast.error(err.message || 'Failed to mark inactive');
     }
   };
 
@@ -220,7 +216,6 @@ export function ItemsModule() {
     setErrors({});
   };
 
-  // Filtered items
   const filteredItems = items.filter((item) =>
     statusFilter === 'all' ? true : item.status_id === Number(statusFilter)
   );
@@ -230,10 +225,9 @@ export function ItemsModule() {
   // -----------------------------
   return (
     <div className="space-y-6">
-      {/* Header and Actions */}
+      {/* Header & Actions */}
       <div className="flex justify-between items-center">
         <p className="text-muted-foreground">Manage your inventory items</p>
-
         <div className="flex gap-2">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger>
@@ -260,7 +254,6 @@ export function ItemsModule() {
                   {editingItem ? 'Update item information' : 'Create a new inventory item'}
                 </div>
               </DialogHeader>
-
               <div className="space-y-4">
                 {/* Name */}
                 <div className="space-y-1">
@@ -272,14 +265,14 @@ export function ItemsModule() {
                     onChange={handleChange}
                     onBlur={(e) => validateField(e.target.name, e.target.value)}
                     placeholder="Enter item name"
-                    className={errors.name ? "border-red-600" : ""}
+                    className={errors.name ? 'border-red-600' : ''}
                   />
                   {errors.name && <p className="text-red-600 text-xs">{errors.name}</p>}
                 </div>
 
                 {/* Quantities */}
                 <div className="flex gap-4">
-                  {["units", "kg", "grams", "litres"].map((field) => (
+                  {['units', 'kg', 'grams', 'litres'].map((field) => (
                     <div key={field} className="flex-1 space-y-1">
                       <Label>{field.charAt(0).toUpperCase() + field.slice(1)}</Label>
                       <Input
@@ -290,8 +283,8 @@ export function ItemsModule() {
                         onBlur={(e) => validateField(e.target.name, e.target.value)}
                         placeholder={`Enter ${field}`}
                         min="0"
-                        step={field === "kg" || field === "litres" ? "0.01" : "1"}
-                        className={errors[field] ? "border-red-600" : ""}
+                        step={field === 'kg' || field === 'litres' ? '0.01' : '1'}
+                        className={errors[field] ? 'border-red-600' : ''}
                       />
                       {errors[field] && <p className="text-red-600 text-xs">{errors[field]}</p>}
                     </div>
@@ -320,7 +313,7 @@ export function ItemsModule() {
                     Cancel
                   </Button>
                   <Button onClick={handleSubmit} disabled={isSubmitting}>
-                    {isSubmitting ? 'Saving...' : (editingItem ? 'Update' : 'Add')} Item
+                    {isSubmitting ? 'Saving...' : editingItem ? 'Update' : 'Add'} Item
                   </Button>
                 </div>
               </div>
@@ -336,7 +329,9 @@ export function ItemsModule() {
           <CardDescription>All inventory items in the system</CardDescription>
         </CardHeader>
         <CardContent className="text-center">
-          {filteredItems.length === 0 ? (
+          {loading ? (
+            <p className="py-8">Loading items...</p>
+          ) : filteredItems.length === 0 ? (
             <p className="text-muted-foreground py-8">No items found. Add your first item!</p>
           ) : (
             <Table>
@@ -365,7 +360,7 @@ export function ItemsModule() {
                       ].filter(Boolean).join(', ') || 'N/A'}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={item.status_id === 1 ? "success" : "destructive"}>
+                      <Badge variant={item.status_id === 1 ? 'success' : 'destructive'}>
                         {item.status}
                       </Badge>
                     </TableCell>
