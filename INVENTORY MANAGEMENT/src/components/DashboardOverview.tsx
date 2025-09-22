@@ -1,147 +1,143 @@
-import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import React, { useEffect, useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell
-} from 'recharts';
-import { Package, Users, AlertTriangle, TrendingUp } from 'lucide-react';
-
-const ITEMS_API_URL = 'http://172.16.4.139:9000/api/items';
-const VENDORS_API_URL = 'http://172.16.4.139:9000/api/vendors';
-const ORDERS_API_URL = 'http://172.16.4.139:9000/api/orders';
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
+import { Package, Users, AlertTriangle, TrendingUp } from "lucide-react";
+import { itemsApi, vendorsApi, ordersApi } from "../api/api"; // ✅ import your common APIs
 
 export function DashboardOverview() {
   const [itemsCount, setItemsCount] = useState(0);
   const [vendorsCount, setVendorsCount] = useState(0);
-  const [mostOrderedItems, setMostOrderedItems] = useState([]);
-  const [mostConsumedItems, setMostConsumedItems] = useState([]);
+  const [mostOrderedItems, setMostOrderedItems] = useState<any[]>([]);
+  const [mostConsumedItems, setMostConsumedItems] = useState<any[]>([]);
+  const [lostStockCount, setLostStockCount] = useState(0);
 
-  // Fetch items count & consumption distribution
+  // ✅ Fetch items
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const res = await fetch(ITEMS_API_URL);
-        if (!res.ok) throw new Error('Failed to fetch items');
-        const data = await res.json();
-        console.log('Items API data:', data);
+        const data = await itemsApi.getAll();
+        console.log("Items API data:", data);
 
         if (Array.isArray(data.data)) {
+           const lost = data.data.filter((item: any) => Number(item.quantity || 0) <= 0).length;
           setItemsCount(data.data.length);
 
-          // Group items by category or type for consumption (adjust as needed)
-          const consumption = {};
-          data?.data?.forEach(item => {
-            const category = item.category || item.type || item.name || 'Others';
+          const consumption: Record<string, number> = {};
+          data.data.forEach((item: any) => {
+            const category = item.category || item.type || item.name || "Others";
             const qty = Number(item.quantity_consumed || item.quantity || 1);
             consumption[category] = (consumption[category] || 0) + qty;
           });
 
-          // Convert to array for recharts
           const consumedArray = Object.entries(consumption).map(([name, value], index) => ({
             name,
             value,
-            // generate a color for each slice
-            fill: ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'][index % 5]
+            fill: ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8"][index % 5],
           }));
 
           consumedArray.sort((a, b) => b.value - a.value);
           setMostConsumedItems(consumedArray.slice(0, 5));
         }
       } catch (error) {
-        console.error('Error fetching items:', error);
+        console.error("Error fetching items:", error);
       }
     };
+
     fetchItems();
   }, []);
 
-  // Fetch vendors count
+  // ✅ Fetch vendors
   useEffect(() => {
     const fetchVendors = async () => {
       try {
-        const res = await fetch(VENDORS_API_URL);
-        if (!res.ok) throw new Error('Failed to fetch vendors');
-        const data = await res.json();
+        const data = await vendorsApi.getAll();
         setVendorsCount(Array.isArray(data.data) ? data.data.length : 0);
       } catch (error) {
-        console.error('Error fetching vendors:', error);
+        console.error("Error fetching vendors:", error);
       }
     };
+
     fetchVendors();
   }, []);
 
-  // Fetch most ordered items dynamically from orders API
-useEffect(() => {
-  const fetchOrders = async () => {
-    try {
-      const res = await fetch(ORDERS_API_URL);
-      if (!res.ok) throw new Error('Failed to fetch orders');
-      const data = await res.json();
-      console.log('Orders API data:', data);
+  // ✅ Fetch orders
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const data = await ordersApi.getAll();
+        console.log("Orders API data:", data);
 
-      // ✅ Make sure we always have an array
-      const ordersArray = Array.isArray(data)
-        ? data
-        : Array.isArray(data.data)
-        ? data.data
-        : [data];
+        const ordersArray = Array.isArray(data.data) ? data.data : [];
+        const orderCounts: Record<string, number> = {};
 
-      const orderCounts: Record<string, number> = {};
+        ordersArray.forEach((order: any) => {
+          if (Array.isArray(order.items)) {
+            order.items.forEach((itemObj: any) => {
+              const itemName = itemObj.name || itemObj.item_name || itemObj.item;
+              const quantity = Number(itemObj.quantity) || 1;
+              if (itemName) {
+                orderCounts[itemName] = (orderCounts[itemName] || 0) + quantity;
+              }
+            });
+          }
+        });
 
-      ordersArray.forEach(order => {
-        if (Array.isArray(order.items)) {
-          order.items.forEach(itemObj => {
-            const itemName = itemObj.name || itemObj.item;
-            const quantity = Number(itemObj.quantity) || 1;
-            if (itemName) {
-              orderCounts[itemName] =
-                (orderCounts[itemName] || 0) + quantity;
-            }
-          });
-        }
-      });
+        const itemsArray = Object.entries(orderCounts).map(([name, orders]) => ({
+          name,
+          orders,
+        }));
 
-      // Convert to array for recharts
-      const itemsArray = Object.entries(orderCounts).map(([name, orders]) => ({
-        name,
-        orders,
-      }));
+        itemsArray.sort((a, b) => b.orders - a.orders);
+        setMostOrderedItems(itemsArray.slice(0, 5));
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+      }
+    };
 
-      // Sort descending & take top 5
-      itemsArray.sort((a, b) => b.orders - a.orders);
-      setMostOrderedItems(itemsArray.slice(0, 5));
-      console.log('Most ordered items array:', itemsArray.slice(0, 5));
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-    }
-  };
+    fetchOrders();
+  }, []);
 
-  fetchOrders();
-}, []);
-
-
-  // Stats Cards Data
+  // ✅ Stats Cards Data (moved inside component)
   const statsData = [
     {
-      title: 'Total Items',
+      title: "Total Items",
       value: itemsCount,
       icon: Package,
-      description: 'Active inventory items',
-      trend: '+12%'
+      description: "Active inventory items",
+      trend: "+12%",
     },
     {
-      title: 'Vendors',
+      title: "Vendors",
       value: vendorsCount,
       icon: Users,
-      description: 'Registered vendors',
-      trend: '+3%'
+      description: "Registered vendors",
+      trend: "+3%",
     },
+      
     {
-      title: 'Lost Stock',
-      value: '15',
-      icon: AlertTriangle,
-      description: 'Items out of stock',
-      trend: '-8%'
-    }
+    title: "Lost Stock",
+    value: lostStockCount, // ✅ dynamic
+    icon: AlertTriangle,
+    description: "Items out of stock",
+    trend: "-8%",
+  },
+  // Inside your component, after fetching items
+
+
+
+
+  
   ];
 
   return (

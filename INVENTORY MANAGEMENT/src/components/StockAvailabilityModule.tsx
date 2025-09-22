@@ -170,6 +170,7 @@ export function StockAvailabilityModule() {
               <Table>
                 <TableHeader>
                   <TableRow >
+                        <TableHead className="text-center">S.No</TableHead>
                     <TableHead className="text-center">Item Name</TableHead>
                     <TableHead className="text-center">Current Stock</TableHead>
                     <TableHead className="text-center">Unit</TableHead>
@@ -178,8 +179,9 @@ export function StockAvailabilityModule() {
                   </TableRow>
                 </TableHeader>
                 <TableBody className="text-center">
-                  {filteredStock?.map((item) => (
+                  {filteredStock?.map((item, index) => (
                     <TableRow key={item.id}>
+                       <TableCell className="font-medium">{index + 1}</TableCell>
                       <TableCell className="font-medium">{item.itemName}</TableCell>
                       <TableCell>
                         <span className={item.quantity <= item.minThreshold ? getStatusColor(item.status) : ''}>
