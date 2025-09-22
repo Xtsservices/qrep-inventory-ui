@@ -22,53 +22,44 @@ export function ItemsModule() {
     name: '',
     type: '',
     status_id: '1',
-    units: '',
-    kg: '',
-    grams: '',
-    litres: '',
+    quantity: '',
+    unit: '',
   });
   const [errors, setErrors] = useState({});
 
   const itemTypes = ['Grains', 'Pulses', 'Oil', 'Vegetables', 'Spices', 'Dairy', 'Others'];
+  const unitOptions = ['Units', 'Kg', 'g', 'L', 'ml'];
 
   // -----------------------------
   // FETCH ITEMS
   // -----------------------------
-const fetchItems = async () => {
-  try {
-    setLoading(true);
-    const response = await itemsApi.getAll();
-    const rawItems = response?.data ?? [];
+  const fetchItems = async () => {
+    try {
+      setLoading(true);
+      const response = await itemsApi.getAll();
+      const rawItems = response?.data ?? [];
 
-    console.log("API items:", rawItems); // <-- add this line
+      const normalizedItems = rawItems.map((item) => {
+        const status_id = Number(item.status_id ?? 1);
+        return {
+          item_id: item.item_id ?? '',
+          name: item.name ?? item.item_name ?? 'Unknown',
+          type: item.type ?? '',
+          status_id,
+          status: status_id === 1 ? 'Active' : 'Inactive',
+          quantity: Number(item.quantity) || 0,
+          unit: item.unit ?? '',
+        };
+      });
 
-    const normalizedItems = rawItems.map((item) => {
-      const status_id = Number(item.status_id ?? 1);
-      return {
-        item_id: item.item_id ?? '',
-        name: item.name ?? item.item_name ?? item.itemName ?? 'Unknown', // check multiple keys
-        type: item.type ?? '', 
-        status_id,
-        status: status_id === 1 ? 'Active' : 'Inactive',
-        units: Number(item.units) || 0,
-        kg: Number(item.kg) || 0,
-        grams: Number(item.grams) || 0,
-        litres: Number(item.litres) || 0,
-      };
-    });
-
-    setItems(normalizedItems.reverse());
-  } catch (err) {
-    console.error("Fetch items error:", err);
-    toast.error("Error fetching items");
-  } finally {
-    setLoading(false);
-  }
-};
-  
-
-
-
+      setItems(normalizedItems.reverse());
+    } catch (err) {
+      console.error("Fetch items error:", err);
+      toast.error("Error fetching items");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => { fetchItems(); }, []);
 
@@ -82,26 +73,22 @@ const fetchItems = async () => {
       else if (!/^[A-Za-z\s\-&()\.]+$/.test(value.trim()))
         error = 'Only alphabets and - & ( ) . are allowed';
     }
-    if (['units', 'kg', 'grams', 'litres'].includes(name)) {
-      if (value && Number(value) < 0) error = 'Value cannot be negative';
+    if (name === 'quantity') {
+      if (!value || Number(value) <= 0) error = 'Quantity must be greater than zero';
     }
     if (name === 'type' && !value.trim()) error = 'Please select item type';
+    if (name === 'unit' && !value.trim()) error = 'Please select unit';
     setErrors((prev) => ({ ...prev, [name]: error }));
     return error === '';
   };
 
   const validateForm = () => {
-    const fields = ['name', 'type', 'units', 'kg', 'grams', 'litres'];
+    const fields = ['name', 'type', 'quantity', 'unit'];
     let valid = true;
     fields.forEach((field) => {
       const value = formData[field] || '';
       if (!validateField(field, value)) valid = false;
     });
-
-    if (!formData.units && !formData.kg && !formData.grams && !formData.litres) {
-      setErrors((prev) => ({ ...prev, units: 'Enter at least one quantity' }));
-      valid = false;
-    }
     return valid;
   };
 
@@ -116,85 +103,71 @@ const fetchItems = async () => {
     setFormData({ ...formData, type: value });
     if (errors.type) validateField('type', value);
   };
+  const handleUnitChange = (value) => {
+    setFormData({ ...formData, unit: value });
+    if (errors.unit) validateField('unit', value);
+  };
 
   // -----------------------------
   // ADD / EDIT SUBMIT
   // -----------------------------
-const handleSubmit = async () => {
-  if (isSubmitting) return;
-  if (!validateForm()) return;
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+    if (!validateForm()) return;
 
-  const itemNameTrimmed = formData.name.trim();
-  const typeTrimmed = formData.type.trim();
+    const itemNameTrimmed = formData.name.trim();
+    const typeTrimmed = formData.type.trim();
 
-  // Prevent empty name
-  if (!itemNameTrimmed) {
-    toast.error("Item name is required");
-    return;
-  }
-
-  // Check duplicate locally
-  if (!editingItem && items.some(i => i.name.toLowerCase() === itemNameTrimmed.toLowerCase())) {
-    toast.error(`Item "${itemNameTrimmed}" already exists!`);
-    return;
-  }
-
-  // Prepare payload for backend
-  const payload = {
-    name: itemNameTrimmed,   // must always come from form input
-    type: typeTrimmed,       // dropdown selection
-    status_id: Number(formData.status_id || 1),
-    units: Number(formData.units) || 0,
-    kg: Number(formData.kg) || 0,
-    grams: Number(formData.grams) || 0,
-    litres: Number(formData.litres) || 0,
-  };
-
-  if (editingItem) payload.item_id = editingItem.item_id;
-
-  setIsSubmitting(true);
-  try {
-    if (editingItem) {
-      await itemsApi.update(editingItem.item_id, payload);
-      toast.success("Item updated successfully!");
-    } else {
-      await itemsApi.add(payload);
-      toast.success("Item added successfully!");
+    if (!editingItem && items.some(i => i.name.toLowerCase() === itemNameTrimmed.toLowerCase())) {
+      toast.error(`Item "${itemNameTrimmed}" already exists!`);
+      return;
     }
-    await fetchItems();
-    handleCloseDialog();
-  } catch (err: any) {
-    console.error("Submit error:", err);
-    toast.error(err.response?.data?.error || err.message || "Something went wrong");
-  } finally {
-    setIsSubmitting(false);
-  }
-};
 
+    const payload = {
+      name: itemNameTrimmed,
+      type: typeTrimmed,
+      status_id: Number(formData.status_id || 1),
+      quantity: Number(formData.quantity) || 0,
+      unit: formData.unit,
+    };
+    if (editingItem) payload.item_id = editingItem.item_id;
 
+    setIsSubmitting(true);
+    try {
+      if (editingItem) {
+        await itemsApi.update(editingItem.item_id, payload);
+        toast.success("Item updated successfully!");
+      } else {
+        await itemsApi.add(payload);
+        toast.success("Item added successfully!");
+      }
+      await fetchItems();
+      handleCloseDialog();
+    } catch (err: any) {
+      console.error("Submit error:", err);
+      toast.error(err.response?.data?.error || err.message || "Something went wrong");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // -----------------------------
   // EDIT
   // -----------------------------
   const handleEdit = (item) => {
-
     const normalizedType =
       itemTypes.find((t) => t.toLowerCase() === (item.type ?? '').toLowerCase().trim()) || '';
     setEditingItem(item);
-  setFormData({
-  name: item.name ?? item.item_name ?? '', // <-- check both keys
-  type: normalizedType,
-  status_id: item.status_id?.toString() ?? '1',
-  units: item.units ?? '',
-  kg: item.kg ?? '',
-  grams: item.grams ?? '',
-  litres: item.litres ?? '',
-});
-
+    setFormData({
+      name: item.name ?? '',
+      type: normalizedType,
+      status_id: item.status_id?.toString() ?? '1',
+      quantity: item.quantity ?? '',
+      unit: item.unit ?? '',
+    });
     setErrors({});
     setShowDialog(true);
   };
-
 
   // -----------------------------
   // DELETE (soft delete)
@@ -214,7 +187,7 @@ const handleSubmit = async () => {
   const handleCloseDialog = () => {
     setShowDialog(false);
     setEditingItem(null);
-    setFormData({ name: '', type: '', status_id: '1', units: '', kg: '', grams: '', litres: '' });
+    setFormData({ name: '', type: '', status_id: '1', quantity: '', unit: '' });
     setErrors({});
   };
 
@@ -272,25 +245,36 @@ const handleSubmit = async () => {
                   {errors.name && <p className="text-red-600 text-xs">{errors.name}</p>}
                 </div>
 
-                {/* Quantities */}
+                {/* Quantity */}
                 <div className="flex gap-4">
-                  {['units', 'kg', 'grams', 'litres'].map((field) => (
-                    <div key={field} className="flex-1 space-y-1">
-                      <Label>{field.charAt(0).toUpperCase() + field.slice(1)}</Label>
-                      <Input
-                        type="number"
-                        name={field}
-                        value={formData[field]}
-                        onChange={handleChange}
-                        onBlur={(e) => validateField(e.target.name, e.target.value)}
-                        placeholder={`Enter ${field}`}
-                        min="0"
-                        step={field === 'kg' || field === 'litres' ? '0.01' : '1'}
-                        className={errors[field] ? 'border-red-600' : ''}
-                      />
-                      {errors[field] && <p className="text-red-600 text-xs">{errors[field]}</p>}
-                    </div>
-                  ))}
+                  <div className="flex-1 space-y-1">
+                    <Label>Quantity *</Label>
+                    <Input
+                      type="number"
+                      name="quantity"
+                      value={formData.quantity}
+                      onChange={handleChange}
+                      onBlur={(e) => validateField(e.target.name, e.target.value)}
+                      placeholder="Enter quantity"
+                      min="0"
+                      className={errors.quantity ? 'border-red-600' : ''}
+                    />
+                    {errors.quantity && <p className="text-red-600 text-xs">{errors.quantity}</p>}
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <Label>Unit *</Label>
+                    <Select value={formData.unit} onValueChange={handleUnitChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select unit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {unitOptions.map((u) => (
+                          <SelectItem key={u} value={u}>{u}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.unit && <p className="text-red-600 text-xs">{errors.unit}</p>}
+                  </div>
                 </div>
 
                 {/* Type */}
@@ -339,27 +323,22 @@ const handleSubmit = async () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-center">S.No</TableHead>
-                  <TableHead className="text-center">Name</TableHead>
-                  <TableHead className="text-center">Type</TableHead>
-                  <TableHead className="text-center">Quantity</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-center">Actions</TableHead>
+                  <TableHead >S.No</TableHead>
+                  <TableHead >Name</TableHead>
+                  <TableHead >Type</TableHead>
+                  <TableHead >Quantity</TableHead>
+                  <TableHead >Status</TableHead>
+                  <TableHead >Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className="text-left">
                 {filteredItems.map((item, index) => (
                   <TableRow key={item.item_id ?? index}>
                     <TableCell>{index + 1}</TableCell>
                     <TableCell>{item.name}</TableCell>
                     <TableCell>{item.type}</TableCell>
                     <TableCell>
-                      {[
-                        item.units > 0 ? `${item.units} Units` : null,
-                        item.kg > 0 ? `${item.kg} Kg` : null,
-                        item.grams > 0 ? `${item.grams} g` : null,
-                        item.litres > 0 ? `${item.litres} L` : null,
-                      ].filter(Boolean).join(', ') || 'N/A'}
+                      {item.quantity > 0 ? `${item.quantity} ${item.unit}` : 'N/A'}
                     </TableCell>
                     <TableCell>
                       <Badge variant={item.status_id === 1 ? 'success' : 'destructive'}>
@@ -367,7 +346,7 @@ const handleSubmit = async () => {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-2 justify-center">
+                      <div className="flex gap-2 justify-left">
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
                           <Edit className="w-4 h-4" />
                         </Button>

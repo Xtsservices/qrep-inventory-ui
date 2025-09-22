@@ -205,7 +205,7 @@
       );
       if (!selectedVendor) return toast.error("Vendor not found");
 
-      const total = items.reduce((sum, i) => sum + (i.quantity * i.price || 0), 0);
+      const total = items.reduce((sum, i) => sum + (i.price || 0), 0);
 
       const itemsForBackend = items.map((i) => ({
         item_name: i.item,
@@ -272,7 +272,7 @@
       vendor_name: editingOrder.vendorName || "Unknown Vendor",
       status: "Completed",
       total: editFormData.reduce(
-        (sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
+        (sum, item) => sum + (Number(item.price) || 0),
         0
       ),
       items: editFormData.map((item) => ({
@@ -508,7 +508,7 @@
               </TableHeader>
              <TableBody>
   {orders
-    .sort((a, b) => a.id - b.id) // ensure frontend sorts by actual order_id
+    .sort((a, b) => new Date(b.date) - new Date(a.date)) // ensure frontend sorts by actual order_id
     .map((order, index) => (
       <TableRow key={order.id}>
         {/* Sequential number for display */}
