@@ -90,7 +90,7 @@ export function LoginPage({ onLogin }: { onLogin: any }) {
               </div>
               <Button
                 onClick={handleSendOtp}
-                className="w-full"
+                className="w-full cursor-pointer"
                 disabled={isLoading || mobileNumber.length !== 10}
               >
                 {isLoading ? 'Sending OTP...' : 'Send OTP'}
@@ -130,7 +130,7 @@ export function LoginPage({ onLogin }: { onLogin: any }) {
               <Button
                 variant="outline"
                 onClick={handleBack}
-                className="w-full"
+                className="w-full cursor-pointer"
                 disabled={isLoading}
               >
                 Back to Mobile Number
