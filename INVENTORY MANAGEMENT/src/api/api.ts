@@ -1,8 +1,10 @@
 // api.ts
 import axios, { AxiosInstance, AxiosResponse } from "axios";
 
-// 🌐 Base URL
-const API_BASE_URL = "http://localhost:9000/api";
+
+// 🌍 Base URL
+const BASE_URL = "http://172.16.4.22:9000/api";
+
 
 // Get token from localStorage
 const getToken = () => localStorage.getItem("token");
@@ -107,4 +109,5 @@ export const authApi = {
   verifyOtp: (payload: any) => handleRequest(axios.post(`${API_BASE_URL}/auth/verifyOtp`, payload, {
     headers: { "Content-Type": "application/json" },
   })),
+
 };

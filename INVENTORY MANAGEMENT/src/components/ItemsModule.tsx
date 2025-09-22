@@ -177,6 +177,7 @@ const handleSubmit = async () => {
   // EDIT
   // -----------------------------
   const handleEdit = (item) => {
+
     const normalizedType =
       itemTypes.find((t) => t.toLowerCase() === (item.type ?? '').toLowerCase().trim()) || '';
     setEditingItem(item);
@@ -193,6 +194,7 @@ const handleSubmit = async () => {
     setErrors({});
     setShowDialog(true);
   };
+
 
   // -----------------------------
   // DELETE (soft delete)

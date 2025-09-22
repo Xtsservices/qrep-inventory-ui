@@ -27,8 +27,10 @@ import {
 } from "./ui/dialog";
 import { Plus, Eye, Trash } from "lucide-react";
 import { toast } from "sonner";
+
 import { vendorsApi } from "../api/api"; // <-- import the centralized API
 import { Badge } from "./ui/badge";
+
 
 export function VendorsModule() {
   const [vendors, setVendors] = useState<any[]>([]);

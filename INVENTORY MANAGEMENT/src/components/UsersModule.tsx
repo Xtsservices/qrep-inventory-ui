@@ -59,7 +59,9 @@ export function UsersModule() {
     let valid = true;
 
     if (!data.name.trim()) { newErrors.name = "Please enter user name"; valid = false; }
+
     else if (!/^[A-Za-z\.s]{2,50}$/.test(data.name.trim())) { newErrors.name = "Name must contain only letters and spaces"; valid = false; }
+
 
     if (!data.mobileNumber.trim()) { newErrors.mobileNumber = "Please enter mobile number"; valid = false; }
     else if (!/^\d{10}$/.test(data.mobileNumber)) { newErrors.mobileNumber = "Mobile number must be 10 digits"; valid = false; }
@@ -353,18 +355,28 @@ export function UsersModule() {
 
               <div className="flex justify-center gap-2 mt-4">
                 <Button variant="outline" onClick={() => setShowViewDialog(false)}>Close</Button>
-                <Button onClick={() => {
-                  setEditingUser(viewingUser);
-                  setEditFormData({
-                    name: viewingUser.name,
-                    mobileNumber: viewingUser.mobileNumber,
-                    email: viewingUser.email,
-                    role: viewingUser.role,
-                    status: viewingUser.status
-                  });
-                  setShowEditDialog(true);
-                  setShowViewDialog(false);
-                }}>Edit User</Button>
+                <Button
+  onClick={() => {
+    if (viewingUser.status === "Inactive") {
+      toast.error("This user is already deleted/inactive");
+      return; // prevent going to edit mode
+    }
+
+    setEditingUser(viewingUser);
+    setEditFormData({
+      name: viewingUser.name,
+      mobileNumber: viewingUser.mobileNumber,
+      email: viewingUser.email,
+      role: viewingUser.role,
+      status: viewingUser.status
+    });
+    setShowEditDialog(true);
+    setShowViewDialog(false);
+  }}
+>
+  Edit User
+</Button>
+
               </div>
             </div>
           )}
@@ -404,13 +416,6 @@ export function UsersModule() {
               <Select value={editFormData.role} onValueChange={value => setEditFormData({ ...editFormData, role: value })}>
                 <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
                 <SelectContent>{roles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Status</Label>
-              <Select value={editFormData.status} onValueChange={value => setEditFormData({ ...editFormData, status: value })}>
-                <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
-                <SelectContent>{statuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="flex justify-end gap-2">
