@@ -10,6 +10,7 @@ import { Calendar } from "./ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Eye, Calendar as CalendarIcon, X, Plus } from "lucide-react";
 import { toast } from "sonner";
+
 import { inventoryRequestsApi } from "../api/api";
 
 const availableItems = [
@@ -17,6 +18,7 @@ const availableItems = [
   "Turmeric Powder", "Wheat Flour", "Sugar", "Salt",
   "Cumin Seeds", "Coriander Seeds"
 ];
+
 
 export function InventoryRequestModule() {
   const [requests, setRequests] = useState<any[]>([]);
@@ -37,11 +39,52 @@ export function InventoryRequestModule() {
     items: [{ name: "", quantity: "", price: "" }]
   });
 
+  // helper to normalize API response -> array
+  const normalizeArrayResponse = (res: any) => {
+    if (Array.isArray(res)) return res;
+    if (res == null) return [];
+    if (Array.isArray(res.data)) return res.data;
+    // some backends return { data: { data: [...] } }
+    if (res.data && Array.isArray(res.data.data)) return res.data.data;
+    // fallback: if res has keys that look like numeric indices, convert
+    if (typeof res === "object") {
+      // try to find an array property
+      for (const k of Object.keys(res)) {
+        if (Array.isArray(res[k])) return res[k];
+      }
+    }
+    return [];
+  };
+
+  // Fetch items dynamically (and build pricing map)
+  useEffect(() => {
+    const fetchItems = async () => {
+      try {
+        const res = await itemsApi.getAll();
+        const arr = normalizeArrayResponse(res);
+        const normalized = arr.map((i: any) => ({
+          id: i.item_id ?? i.id ?? i._id ?? String(i.name ?? Math.random()),
+          name: i.name ?? i.item_name ?? i.title ?? String(i.id ?? i.item_id ?? ""),
+          price: Number(i.price ?? i.default_price ?? i.unit_price ?? i.defaultPrice ?? 0),
+        }));
+        setAvailableItems(normalized);
+        const pricingMap: Record<string, number> = {};
+        normalized.forEach((it: any) => { pricingMap[it.name] = Number(it.price) || 0; });
+        setItemPricing(pricingMap);
+      } catch (err) {
+        console.error("Failed to fetch items list:", err);
+        toast.error("Failed to load items list");
+      }
+    };
+    fetchItems();
+  }, []);
+
   // Fetch inventory requests from API
   useEffect(() => {
     const fetchRequests = async () => {
       setLoading(true);
       try {
+
         const data = await inventoryRequestsApi.getAll();
         const formatted = data.map((r: any) => ({
           id: r.id,
@@ -53,6 +96,7 @@ export function InventoryRequestModule() {
             price: Number(i.price) || 0
           })),
           totalPrice: Number(r.total_price) || r.items.reduce((sum: number, i: any) => sum + (Number(i.price) * Number(i.quantity)), 0),
+
         }));
         setRequests(formatted);
       } catch (err) {
@@ -80,14 +124,18 @@ export function InventoryRequestModule() {
     }
   };
 
+
   const updateItemRow = (index: number, field: string, value: string) => {
     const newItems = [...addFormData.items];
     newItems[index][field] = value;  // keep as string
+
     setAddFormData({ ...addFormData, items: newItems });
   };
 
   const handleAddInventoryRequest = async () => {
+
     const validItems = addFormData.items.filter(i => i.name && i.quantity && Number(i.price) >= 0);
+
     if (!validItems.length) {
       toast.error("Please add at least one valid item");
       return;
@@ -122,6 +170,7 @@ export function InventoryRequestModule() {
         totalPrice:
           Number(r.total_price) ||
           r.items.reduce((sum: number, i: any) => sum + (Number(i.price) * Number(i.quantity)), 0),
+
       }));
 
       setRequests(formatted);

@@ -94,6 +94,7 @@ useEffect(() => {
   }, []);
 
   // ✅ Fetch orders
+
 // ✅ Fetch orders
 useEffect(() => {
   const fetchOrders = async () => {
@@ -141,6 +142,7 @@ useEffect(() => {
       // Fill to ensure 5 items in chart
       while (itemsArray.length < 5) {
         itemsArray.push({ name: "Unknown", orders: 0 });
+
       }
 
       setMostOrderedItems(itemsArray.slice(0, 5));
@@ -155,7 +157,20 @@ useEffect(() => {
 
 
 
-  // ✅ Stats Cards Data (moved inside component)
+  // ✅ Aggregate consumed items to remove duplicates and assign unique colors
+  const aggregatedConsumedItems = useMemo(() => {
+    const map: Record<string, number> = {};
+    mostConsumedItems.forEach(item => {
+      map[item.name] = (map[item.name] || 0) + item.value;
+    });
+    return Object.entries(map).map(([name, value], index) => ({
+      name,
+      value,
+      fill: COLORS[index % COLORS.length],
+    }));
+  }, [mostConsumedItems]);
+
+  // Stats Cards Data
   const statsData = [
     {
       title: "Total Items",
