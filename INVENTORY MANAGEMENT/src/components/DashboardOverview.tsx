@@ -74,41 +74,66 @@ export function DashboardOverview() {
   }, []);
 
   // ✅ Fetch orders
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const data = await ordersApi.getAll();
-        console.log("Orders API data:", data);
+// ✅ Fetch orders
+useEffect(() => {
+  const fetchOrders = async () => {
+    try {
+      const data = await ordersApi.getAll();
+      const ordersArray = Array.isArray(data.data) ? data.data : [];
+      const orderCounts: Record<string, number> = {};
 
-        const ordersArray = Array.isArray(data.data) ? data.data : [];
-        const orderCounts: Record<string, number> = {};
+      ordersArray.forEach((order: any) => {
+        if (Array.isArray(order.items)) {
+          order.items.forEach((itemObj: any) => {
+            // Normalize possible keys
+            let itemName =
+              itemObj.name ||
+              itemObj.item_name ||
+              itemObj.item ||
+              itemObj.ItemName ||
+              itemObj.Item ||
+              "Unknown";
 
-        ordersArray.forEach((order: any) => {
-          if (Array.isArray(order.items)) {
-            order.items.forEach((itemObj: any) => {
-              const itemName = itemObj.name || itemObj.item_name || itemObj.item;
-              const quantity = Number(itemObj.quantity) || 1;
-              if (itemName) {
-                orderCounts[itemName] = (orderCounts[itemName] || 0) + quantity;
-              }
-            });
-          }
-        });
+            // Clean and fallback
+            if (typeof itemName !== "string" || !itemName.trim()) {
+              itemName = "Unknown";
+            }
+            itemName = itemName.trim();
 
-        const itemsArray = Object.entries(orderCounts).map(([name, orders]) => ({
-          name,
-          orders,
-        }));
+            const quantity = Number(itemObj.quantity || itemObj.qty || 1);
 
-        itemsArray.sort((a, b) => b.orders - a.orders);
-        setMostOrderedItems(itemsArray.slice(0, 5));
-      } catch (error) {
-        console.error("Error fetching orders:", error);
+            // Count orders
+            orderCounts[itemName] = (orderCounts[itemName] || 0) + quantity;
+          });
+        }
+      });
+
+      // Convert to array and truncate long names for display
+      let itemsArray = Object.entries(orderCounts).map(([name, orders]) => {
+        // Show only first word or limit to 12 chars
+        let displayName = name.split(" ")[0]; // or: name.length > 12 ? name.slice(0,12) : name
+        return { name: displayName, orders };
+      });
+
+      // Sort descending
+      itemsArray.sort((a, b) => b.orders - a.orders);
+
+      // Fill to ensure 5 items in chart
+      while (itemsArray.length < 5) {
+        itemsArray.push({ name: "Unknown", orders: 0 });
       }
-    };
 
-    fetchOrders();
-  }, []);
+      setMostOrderedItems(itemsArray.slice(0, 5));
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+    }
+  };
+
+  fetchOrders();
+}, []);
+
+
+
 
   // ✅ Stats Cards Data (moved inside component)
   const statsData = [

@@ -10,26 +10,13 @@ import { Calendar } from "./ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Eye, Calendar as CalendarIcon, X, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { inventoryRequestsApi } from "../api//api"; // your backend API
+import { inventoryRequestsApi } from "../api/api";
 
 const availableItems = [
   "Basmati Rice", "Toor Dal", "Refined Oil", "Onions",
   "Turmeric Powder", "Wheat Flour", "Sugar", "Salt",
   "Cumin Seeds", "Coriander Seeds"
 ];
-
-const itemPricing: Record<string, number> = {
-  "Basmati Rice": 80,
-  "Toor Dal": 80,
-  "Refined Oil": 150,
-  "Onions": 30,
-  "Turmeric Powder": 150,
-  "Wheat Flour": 30,
-  "Sugar": 50,
-  "Salt": 20,
-  "Cumin Seeds": 400,
-  "Coriander Seeds": 300
-};
 
 export function InventoryRequestModule() {
   const [requests, setRequests] = useState<any[]>([]);
@@ -43,7 +30,7 @@ export function InventoryRequestModule() {
 
   const [addFormData, setAddFormData] = useState({
     requestedBy: "Kitchen Staff",
-    items: [{ name: "", quantity: "", price: 0 }]
+    items: [{ name: "", quantity: "", price: "" }]
   });
 
   // Fetch inventory requests from API
@@ -53,14 +40,14 @@ export function InventoryRequestModule() {
         const data = await inventoryRequestsApi.getAll();
         const formatted = data.map((r: any) => ({
           id: r.id,
-          date: r.request_date,
+          date: r.request_date ? new Date(r.request_date) : new Date(),
           requestedBy: r.requested_by || "Kitchen Staff",
           items: r.items.map((i: any) => ({
             name: i.item_name,
             quantity: i.quantity,
             price: i.price
           })),
-          totalPrice: Number(r.total_price) || r.items.reduce((sum: number, i: any) => sum + Number(i.price), 0),
+          totalPrice: Number(r.total_price) || r.items.reduce((sum: number, i: any) => sum + (Number(i.price) * Number(i.quantity)), 0),
         }));
         setRequests(formatted);
       } catch (err) {
@@ -79,7 +66,7 @@ export function InventoryRequestModule() {
   };
 
   const addItemRow = () => {
-    setAddFormData({ ...addFormData, items: [...addFormData.items, { name: "", quantity: "", price: 0 }] });
+    setAddFormData({ ...addFormData, items: [...addFormData.items, { name: "", quantity: "", price: "" }] });
   };
 
   const removeItemRow = (index: number) => {
@@ -88,24 +75,14 @@ export function InventoryRequestModule() {
     }
   };
 
-  const updateItemRow = (index: number, field: string, value: any) => {
+  const updateItemRow = (index: number, field: string, value: string) => {
     const newItems = [...addFormData.items];
-    newItems[index][field] = value;
-
-    // Auto-calculate price
-    const itemName = newItems[index].name;
-    const quantity = parseFloat(newItems[index].quantity.toString().replace(/[^\d.]/g, "")) || 0;
-    if (itemName && quantity && itemPricing[itemName]) {
-      newItems[index].price = Math.round(quantity * itemPricing[itemName]);
-    } else {
-      newItems[index].price = 0;
-    }
-
+    newItems[index][field] = value;  // keep as string
     setAddFormData({ ...addFormData, items: newItems });
   };
 
   const handleAddInventoryRequest = async () => {
-    const validItems = addFormData.items.filter(i => i.name && i.quantity && i.price > 0);
+    const validItems = addFormData.items.filter(i => i.name && i.quantity && Number(i.price) >= 0);
     if (!validItems.length) {
       toast.error("Please add at least one valid item");
       return;
@@ -113,7 +90,13 @@ export function InventoryRequestModule() {
 
     const payload = {
       requested_by: addFormData.requestedBy,
-      items: validItems.map(i => ({ item_name: i.name, quantity: i.quantity, price: i.price }))
+      items: addFormData.items
+        .filter(i => i.name && i.quantity && Number(i.price) >= 0)
+        .map(i => ({
+          item_name: i.name,
+          quantity: Number(i.quantity) || 0,
+          price: Number(i.price) || 0
+        }))
     };
 
     try {
@@ -124,18 +107,21 @@ export function InventoryRequestModule() {
       const data = await inventoryRequestsApi.getAll();
       const formatted = data.map((r: any) => ({
         id: r.id,
-        date: r.request_date,
+        date: r.request_date ? new Date(r.request_date) : new Date(),
         requestedBy: r.requested_by || "Kitchen Staff",
         items: r.items.map((i: any) => ({
           name: i.item_name,
-          quantity: i.quantity,
-          price: i.price
+          quantity: Number(i.quantity) || 0,
+          price: Number(i.price) || 0
         })),
-        totalPrice: r.total_price
+        totalPrice:
+          Number(r.total_price) ||
+          r.items.reduce((sum: number, i: any) => sum + (Number(i.price) * Number(i.quantity)), 0),
       }));
+
       setRequests(formatted);
       setShowAddDialog(false);
-      setAddFormData({ requestedBy: "Kitchen Staff", items: [{ name: "", quantity: "", price: 0 }] });
+      setAddFormData({ requestedBy: "Kitchen Staff", items: [{ name: "", quantity: "", price: "" }] });
     } catch (err) {
       console.error(err);
       toast.error("Failed to add inventory request");
@@ -172,6 +158,7 @@ export function InventoryRequestModule() {
 
   return (
     <div className="space-y-6">
+      {/* Add Inventory & Filter Section */}
       <div className="flex justify-between items-start">
         <div>
           <p className="text-muted-foreground">Kitchen inventory requests by date</p>
@@ -210,11 +197,11 @@ export function InventoryRequestModule() {
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Quantity</Label>
-                        <Input value={item.quantity} onChange={e => updateItemRow(index, "quantity", e.target.value)} placeholder="e.g., 10 kg" />
+                        <Input value={item.quantity} onChange={e => updateItemRow(index, "quantity", e.target.value)} placeholder="e.g., 10" />
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Price</Label>
-                        <div className="h-10 px-3 py-2 bg-muted/30 border rounded-md flex items-center text-sm">{item.price > 0 ? `₹${item.price}` : "Auto-calculated"}</div>
+                        <Input type="number" value={item.price} onChange={e => updateItemRow(index, "price", e.target.value)} placeholder="0" />
                       </div>
                       <div>
                         {addFormData.items.length > 1 && <Button type="button" variant="outline" size="sm" className="text-red-600 hover:text-red-600" onClick={() => removeItemRow(index)}><X className="w-3 h-3" /></Button>}
@@ -248,6 +235,7 @@ export function InventoryRequestModule() {
         </div>
       </div>
 
+      {/* Requests Table */}
       <Card>
         <CardHeader>
           <CardTitle>Date-wise Requests</CardTitle>

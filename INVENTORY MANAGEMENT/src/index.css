@@ -119,6 +119,9 @@
     --color-border: var(--border);
   }
 }
+.badge-inactive {
+  @apply bg-black text-white;
+}
 
 @layer base {
   *, :after, :before, ::backdrop {
