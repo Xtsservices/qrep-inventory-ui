@@ -102,7 +102,7 @@ export function VendorsModule() {
     else if (!/^\S+@\S+\.\S+$/.test(formData.contact_email)) errors.contact_email = "Invalid email format";
 
     if (!formData.gst_number.trim()) errors.gst_number = "GST Number is required";
-    else if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(formData.gst_number))
+    else if (!/^[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(formData.gst_number))
       errors.gst_number = "Invalid GST Number";
 
     if (!formData.pan_number.trim()) errors.pan_number = "PAN Number is required";
@@ -261,7 +261,7 @@ export function VendorsModule() {
                   </div>
 
                   <div className="flex flex-col">
-                    <Label className="font-medium mb-1">Contact Mobile</Label>
+                    <Label className="font-medium mb-1">Contact Mobile*</Label>
                     <Input
                       placeholder="Enter contact mobile"
                       maxLength={10}
@@ -280,7 +280,7 @@ export function VendorsModule() {
 
                 {/* Contact Email */}
                 <div className="flex flex-col">
-                  <Label className="font-medium mb-1">Contact Email</Label>
+                  <Label className="font-medium mb-1">Contact Email*</Label>
                   <Input
                     placeholder="Enter contact email"
                     value={formData.contact_email}
@@ -297,7 +297,7 @@ export function VendorsModule() {
                 {/* GST & PAN */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex flex-col">
-                    <Label className="font-medium mb-1">GST Number</Label>
+                    <Label className="font-medium mb-1">GST Number*</Label>
                     <Input
                       placeholder="Enter GST number"
                       value={formData.gst_number}
@@ -312,7 +312,7 @@ export function VendorsModule() {
                   </div>
 
                   <div className="flex flex-col">
-                    <Label className="font-medium mb-1">PAN Number</Label>
+                    <Label className="font-medium mb-1">PAN Number*</Label>
                     <Input
                       placeholder="Enter PAN number"
                       value={formData.pan_number}
@@ -329,7 +329,7 @@ export function VendorsModule() {
 
                 {/* Full Address */}
                 <div className="flex flex-col">
-                  <Label className="font-medium mb-1">Full Address</Label>
+                  <Label className="font-medium mb-1">Full Address*</Label>
                   <Input
                     placeholder="Enter complete address"
                     value={formData.full_address}

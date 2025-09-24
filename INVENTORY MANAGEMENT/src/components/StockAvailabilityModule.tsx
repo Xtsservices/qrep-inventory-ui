@@ -170,15 +170,15 @@ export function StockAvailabilityModule() {
               <Table>
                 <TableHeader>
                   <TableRow >
-                        <TableHead className="text-center">S.No</TableHead>
-                    <TableHead className="text-center">Item Name</TableHead>
-                    <TableHead className="text-center">Current Stock</TableHead>
-                    <TableHead className="text-center">Unit</TableHead>
-                    <TableHead className="text-center">Min Threshold</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
+                        <TableHead >S.No</TableHead>
+                    <TableHead >Item Name</TableHead>
+                    <TableHead >Current Stock</TableHead>
+                    <TableHead >Unit</TableHead>
+                    <TableHead >Min Threshold</TableHead>
+                    <TableHead >Status</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody className="text-center">
+                <TableBody className="text-left">
                   {filteredStock?.map((item, index) => (
                     <TableRow key={item.id}>
                        <TableCell className="font-medium">{index + 1}</TableCell>

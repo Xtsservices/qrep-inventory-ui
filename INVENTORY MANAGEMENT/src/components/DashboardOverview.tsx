@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import {
-
   BarChart,
   Bar,
   XAxis,
@@ -16,48 +15,69 @@ import {
 import { Package, Users, AlertTriangle, TrendingUp } from "lucide-react";
 import { itemsApi, vendorsApi, ordersApi } from "../api/api"; // ✅ import your common APIs
 
-
 export function DashboardOverview() {
   const [itemsCount, setItemsCount] = useState(0);
   const [vendorsCount, setVendorsCount] = useState(0);
   const [mostOrderedItems, setMostOrderedItems] = useState<any[]>([]);
   const [mostConsumedItems, setMostConsumedItems] = useState<any[]>([]);
+  const [pieData, setPieData] = useState<any[]>([]);
   const [lostStockCount, setLostStockCount] = useState(0);
 
+  // Color palette for pie chart
+  const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#AA00FF", "#FF0066", "#FF3366", "#33CCFF"];
+
   // ✅ Fetch items
+useEffect(() => {
+  const fetchItems = async () => {
+    try {
+      const data = await itemsApi.getAll();
+      if (!Array.isArray(data.data)) return;
+
+      const lost = data.data.filter((item: any) => Number(item.quantity || 0) <= 0).length;
+      setLostStockCount(lost);
+      setItemsCount(data.data.length);
+
+      // 1️⃣ Aggregate by name first
+      const consumptionMap: Record<string, number> = {};
+      data.data.forEach((item: any) => {
+        const name = item.name || item.category || item.type || "Others";
+        const qty = Number(item.quantity_consumed || item.quantity || 1);
+        consumptionMap[name] = (consumptionMap[name] || 0) + qty;
+      });
+
+      // 2️⃣ Convert to array, sort descending, take top 5
+      const aggregatedArray = Object.entries(consumptionMap)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5);
+
+      // 3️⃣ Assign colors
+      const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#AA00FF", "#FF0066", "#FF3366", "#33CCFF"];
+      const finalArray = aggregatedArray.map((item, index) => ({
+        ...item,
+        fill: COLORS[index % COLORS.length],
+      }));
+
+      setMostConsumedItems(finalArray); // ✅ store fully aggregated & colored
+    } catch (error) {
+      console.error("Error fetching items:", error);
+    }
+  };
+
+  fetchItems();
+}, []);
+
+
+
+
+
   useEffect(() => {
-    const fetchItems = async () => {
-      try {
-        const data = await itemsApi.getAll();
-        console.log("Items API data:", data);
+    if (mostConsumedItems.length > 0) {
+      const timer = setTimeout(() => setPieData(mostConsumedItems), 100); // small delay triggers animation
+      return () => clearTimeout(timer);
+    }
+  }, [mostConsumedItems]);
 
-        if (Array.isArray(data.data)) {
-           const lost = data.data.filter((item: any) => Number(item.quantity || 0) <= 0).length;
-          setItemsCount(data.data.length);
-
-          const consumption: Record<string, number> = {};
-          data.data.forEach((item: any) => {
-            const category = item.category || item.type || item.name || "Others";
-            const qty = Number(item.quantity_consumed || item.quantity || 1);
-            consumption[category] = (consumption[category] || 0) + qty;
-          });
-
-          const consumedArray = Object.entries(consumption).map(([name, value], index) => ({
-            name,
-            value,
-            fill: ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8"][index % 5],
-          }));
-
-          consumedArray.sort((a, b) => b.value - a.value);
-          setMostConsumedItems(consumedArray.slice(0, 5));
-        }
-      } catch (error) {
-        console.error("Error fetching items:", error);
-      }
-    };
-
-    fetchItems();
-  }, []);
 
   // ✅ Fetch vendors
   useEffect(() => {
@@ -151,20 +171,13 @@ useEffect(() => {
       description: "Registered vendors",
       trend: "+3%",
     },
-      
     {
-    title: "Lost Stock",
-    value: lostStockCount, // ✅ dynamic
-    icon: AlertTriangle,
-    description: "Items out of stock",
-    trend: "-8%",
-  },
-  // Inside your component, after fetching items
-
-
-
-
-  
+      title: "Lost Stock",
+      value: lostStockCount,
+      icon: AlertTriangle,
+      description: "Items out of stock",
+      trend: "-8%",
+    },
   ];
 
   return (
@@ -220,22 +233,24 @@ useEffect(() => {
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
-                <Pie
-                  data={mostConsumedItems}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {mostConsumedItems.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
+  <Pie
+    data={pieData}
+    cx="50%"
+    cy="50%"
+    labelLine={false}
+    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+    outerRadius={80}
+    dataKey="value"
+    isAnimationActive={true}      // ✅ enable animation
+    animationDuration={1500} 
+  >
+    {mostConsumedItems.map((entry, index) => (
+      <Cell key={`cell-${index}`} fill={entry.fill} />
+    ))}
+  </Pie>
+  <Tooltip />
+</PieChart>
+
             </ResponsiveContainer>
           </CardContent>
         </Card>

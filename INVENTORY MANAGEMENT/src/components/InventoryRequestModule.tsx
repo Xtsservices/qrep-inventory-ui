@@ -28,6 +28,10 @@ export function InventoryRequestModule() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
 
+  // dynamic items/pricing
+  const [availableItems, setAvailableItems] = useState<any[]>([]); // [{ id, name, price }]
+  const [itemPricing, setItemPricing] = useState<Record<string, number>>({});
+
   const [addFormData, setAddFormData] = useState({
     requestedBy: "Kitchen Staff",
     items: [{ name: "", quantity: "", price: "" }]
@@ -36,6 +40,7 @@ export function InventoryRequestModule() {
   // Fetch inventory requests from API
   useEffect(() => {
     const fetchRequests = async () => {
+      setLoading(true);
       try {
         const data = await inventoryRequestsApi.getAll();
         const formatted = data.map((r: any) => ({
@@ -45,13 +50,13 @@ export function InventoryRequestModule() {
           items: r.items.map((i: any) => ({
             name: i.item_name,
             quantity: i.quantity,
-            price: i.price
+            price: Number(i.price) || 0
           })),
           totalPrice: Number(r.total_price) || r.items.reduce((sum: number, i: any) => sum + (Number(i.price) * Number(i.quantity)), 0),
         }));
         setRequests(formatted);
       } catch (err) {
-        console.error(err);
+        console.error("Failed to load inventory requests:", err);
         toast.error("Failed to load inventory requests");
       } finally {
         setLoading(false);
@@ -120,10 +125,11 @@ export function InventoryRequestModule() {
       }));
 
       setRequests(formatted);
+
       setShowAddDialog(false);
       setAddFormData({ requestedBy: "Kitchen Staff", items: [{ name: "", quantity: "", price: "" }] });
     } catch (err) {
-      console.error(err);
+      console.error("Failed to add inventory request:", err);
       toast.error("Failed to add inventory request");
     }
   };
@@ -154,7 +160,7 @@ export function InventoryRequestModule() {
     weekday: "short", year: "numeric", month: "short", day: "numeric"
   });
 
-  const totalValue = filteredRequests.reduce((sum, r) => sum + r.totalPrice, 0);
+  const totalValue = filteredRequests.reduce((sum, r) => sum + Number(r.totalPrice || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -191,7 +197,7 @@ export function InventoryRequestModule() {
                         <Select value={item.name} onValueChange={v => updateItemRow(index, "name", v)}>
                           <SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger>
                           <SelectContent>
-                            {availableItems.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}
+                            {availableItems.map(i => <SelectItem key={i.id} value={i.name}>{i.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
@@ -311,7 +317,7 @@ export function InventoryRequestModule() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {viewingRequest.items.map((item, idx) => (
+                      {viewingRequest.items.map((item: any, idx: number) => (
                         <TableRow key={idx}>
                           <TableCell>{item.name}</TableCell>
                           <TableCell>{item.quantity}</TableCell>
