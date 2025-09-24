@@ -168,12 +168,12 @@ export function UsersModule() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-center">S. No.</TableHead>
-                <TableHead className="text-center">Name</TableHead>
-                <TableHead className="text-center">Role</TableHead>
-                <TableHead className="text-center">Mobile Number</TableHead>
-                <TableHead className="text-center">Email</TableHead>
-                <TableHead className="text-center">Status</TableHead>
+                <TableHead >S. No.</TableHead>
+                <TableHead >Name</TableHead>
+                <TableHead >Role</TableHead>
+                <TableHead >Mobile Number</TableHead>
+                <TableHead >Email</TableHead>
+                <TableHead >Status</TableHead>
                 <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -183,7 +183,7 @@ export function UsersModule() {
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No users found</TableCell>
                 </TableRow>
               ) : users?.map((user,index) => (
-                <TableRow key={user.id} className="text-center">
+                <TableRow key={user.id} className="text-left">
                   <TableCell>{index + 1}</TableCell>
                   <TableCell>{user.name}</TableCell>
                   <TableCell><Badge variant={getRoleBadgeVariant(user.role)}>{user.role}</Badge></TableCell>
