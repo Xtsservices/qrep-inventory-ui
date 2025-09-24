@@ -65,6 +65,7 @@
   }
 }
 
+
 @layer theme {
   :root, :host {
     --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
@@ -133,6 +134,9 @@
     margin: 0;
     padding: 0;
   }
+  button {
+  cursor: pointer;
+}
 
   html, :host {
     -webkit-text-size-adjust: 100%;
