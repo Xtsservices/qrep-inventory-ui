@@ -127,6 +127,10 @@ button {
   cursor: pointer;
 }
 
+button {
+  cursor: pointer;
+}
+
 @layer base {
   *, :after, :before, ::backdrop {
     box-sizing: border-box;

@@ -69,7 +69,16 @@ export function InventoryRequestModule() {
   useEffect(() => {
     const fetchRequests = async () => {
       setLoading(true);
+      setLoading(true);
       try {
+        const res = await inventoryRequestsApi.getAll();
+        const arr = normalizeArrayResponse(res);
+        const formatted = arr.map((r: any) => ({
+          id: r.id ?? r.request_id ?? r._id,
+          date: r.request_date ?? r.date ?? r.created_at,
+          requestedBy: r.requested_by || r.requestedBy || "Kitchen Staff",
+          items: (r.items || []).map((i: any) => ({
+            name: i.item_name ?? i.name,
         const res = await inventoryRequestsApi.getAll();
         const arr = normalizeArrayResponse(res);
         const formatted = arr.map((r: any) => ({
@@ -80,11 +89,14 @@ export function InventoryRequestModule() {
             name: i.item_name ?? i.name,
             quantity: i.quantity,
             price: Number(i.price) || 0
+            price: Number(i.price) || 0
           })),
+          totalPrice: Number(r.total_price) || (r.items ? r.items.reduce((sum: number, i: any) => sum + Number(i.price || 0), 0) : 0),
           totalPrice: Number(r.total_price) || (r.items ? r.items.reduce((sum: number, i: any) => sum + Number(i.price || 0), 0) : 0),
         }));
         setRequests(formatted);
       } catch (err) {
+        console.error("Failed to load inventory requests:", err);
         console.error("Failed to load inventory requests:", err);
         toast.error("Failed to load inventory requests");
       } finally {
@@ -118,6 +130,7 @@ export function InventoryRequestModule() {
 
   const handleAddInventoryRequest = async () => {
     const validItems = addFormData.items.filter(i => i.name && i.quantity && Number(i.price) > 0);
+    const validItems = addFormData.items.filter(i => i.name && i.quantity && Number(i.price) > 0);
     if (!validItems.length) {
       toast.error("Please add at least one valid item");
       return;
@@ -142,14 +155,18 @@ export function InventoryRequestModule() {
           name: i.item_name ?? i.name,
           quantity: i.quantity,
           price: Number(i.price) || 0
+          price: Number(i.price) || 0
         })),
+        totalPrice: Number(r.total_price) || (r.items ? r.items.reduce((sum: number, i: any) => sum + Number(i.price || 0), 0) : 0),
         totalPrice: Number(r.total_price) || (r.items ? r.items.reduce((sum: number, i: any) => sum + Number(i.price || 0), 0) : 0),
       }));
       setRequests(formatted);
 
+
       setShowAddDialog(false);
       setAddFormData({ requestedBy: "Kitchen Staff", items: [{ name: "", quantity: "", price: 0 }] });
     } catch (err) {
+      console.error("Failed to add inventory request:", err);
       console.error("Failed to add inventory request:", err);
       toast.error("Failed to add inventory request");
     }
@@ -181,6 +198,7 @@ export function InventoryRequestModule() {
     weekday: "short", year: "numeric", month: "short", day: "numeric"
   });
 
+  const totalValue = filteredRequests.reduce((sum, r) => sum + Number(r.totalPrice || 0), 0);
   const totalValue = filteredRequests.reduce((sum, r) => sum + Number(r.totalPrice || 0), 0);
 
   return (
@@ -216,6 +234,7 @@ export function InventoryRequestModule() {
                         <Select value={item.name} onValueChange={v => updateItemRow(index, "name", v)}>
                           <SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger>
                           <SelectContent>
+                            {availableItems.map(i => <SelectItem key={i.id} value={i.name}>{i.name}</SelectItem>)}
                             {availableItems.map(i => <SelectItem key={i.id} value={i.name}>{i.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
@@ -345,6 +364,7 @@ export function InventoryRequestModule() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
+                      {viewingRequest.items.map((item: any, idx: number) => (
                       {viewingRequest.items.map((item: any, idx: number) => (
                         <TableRow key={idx}>
                           <TableCell>{item.name}</TableCell>

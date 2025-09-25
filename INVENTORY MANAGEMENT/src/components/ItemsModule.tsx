@@ -56,6 +56,14 @@ export function ItemsModule() {
       setLoading(false);
     }
   };
+      setItems(normalizedItems.reverse());
+    } catch (err) {
+      console.error("Fetch items error:", err);
+      toast.error("Error fetching items");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => { fetchItems(); }, []);
 
@@ -68,6 +76,7 @@ export function ItemsModule() {
         error = 'Only alphabets and - & ( ) . are allowed';
     }
     if (name === 'type' && !value.trim()) error = 'Please select item type';
+    if (name === 'unit' && !value.trim()) error = 'Please select unit';
     if (name === 'unit' && !value.trim()) error = 'Please select unit';
     setErrors((prev) => ({ ...prev, [name]: error }));
     return error === '';
@@ -91,6 +100,10 @@ export function ItemsModule() {
   const handleTypeChange = (value) => {
     setFormData({ ...formData, type: value });
     if (errors.type) validateField('type', value);
+  };
+  const handleUnitChange = (value) => {
+    setFormData({ ...formData, unit: value });
+    if (errors.unit) validateField('unit', value);
   };
   const handleUnitChange = (value) => {
     setFormData({ ...formData, unit: value });
@@ -292,6 +305,7 @@ export function ItemsModule() {
                 </TableRow>
               </TableHeader>
               <TableBody className="text-left">
+              <TableBody className="text-left">
                 {filteredItems.map((item, index) => (
                   <TableRow key={item.item_id ?? index}>
                     <TableCell>{index + 1}</TableCell>
@@ -304,6 +318,7 @@ export function ItemsModule() {
                       </Badge>
                     </TableCell>
                     <TableCell>
+                      <div className="flex gap-2 justify-left">
                       <div className="flex gap-2 justify-left">
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
                           <Edit className="w-4 h-4" />

@@ -284,6 +284,7 @@ const fetchOrders = () => {
       status: "Completed",
       total: editFormData.reduce(
         (sum, item) => sum + (Number(item.price) || 0),
+        (sum, item) => sum + (Number(item.price) || 0),
         0
       ),
       items: editFormData.map((item) => ({
@@ -510,6 +511,7 @@ const fetchOrders = () => {
               </TableHeader>
              <TableBody>
   {orders
+    .sort((a, b) => new Date(b.date) - new Date(a.date)) // ensure frontend sorts by actual order_id
     .sort((a, b) => new Date(b.date) - new Date(a.date)) // ensure frontend sorts by actual order_id
     .map((order, index) => (
       <TableRow key={order.id}>
