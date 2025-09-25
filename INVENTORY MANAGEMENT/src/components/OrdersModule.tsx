@@ -1,249 +1,263 @@
+import React, { useEffect, useState } from "react";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogDescription,
+} from "./ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { Badge } from "./ui/badge";
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
+import { Plus, Edit, Eye, X } from "lucide-react";
+import { toast } from "sonner";
 
-  import React, { useEffect, useState } from "react";
-  import { Button } from "./ui/button";
-  import { Input } from "./ui/input";
-  import { Label } from "./ui/label";
-  import { Textarea } from "./ui/textarea";
-  import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-  } from "./ui/table";
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from "./ui/card";
-  import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-    DialogDescription,
-  } from "./ui/dialog";
-  import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-  } from "./ui/select";
-  import { Badge } from "./ui/badge";
-  import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
-  import { Plus, Edit, Eye, X } from "lucide-react";
-  import { toast } from "sonner";
+// ✅ import centralized API
+import { vendorsApi, itemsApi, ordersApi } from '../api/api';
 
-  // ✅ import centralized API
-  import { vendorsApi, itemsApi, ordersApi } from '../api/api';
+// Units for dropdown
+const UNITS = ["KG", "Liters", "Pieces", "Box"];
 
-  // Units for dropdown
-  const UNITS = ["KG", "Liters", "Pieces", "Box"];
+interface Vendor {
+  id: string | number;
+  name: string;
+}
 
-  interface Vendor {
-    id: string | number;
-    name: string;
-  }
+interface Item {
+  id: string | number;
+  name: string;
+}
 
-  interface Item {
-    id: string | number;
-    name: string;
-  }
+interface BulkItem {
+  itemId: string;
+  quantity: string;
+  unit?: string;
+}
 
-  interface BulkItem {
-    itemId: string;
-    quantity: string;
-    unit?: string;
-  }
+interface OrderFormData {
+  orderType: "single" | "bulk";
+  vendorId: string;
+  singleItemId: string;
+  bulkItems: BulkItem[];
+  quantity: string;
+  unit: string;
+  notes: string;
+}
 
-  interface OrderFormData {
-    orderType: "single" | "bulk";
-    vendorId: string;
-    singleItemId: string;
-    bulkItems: BulkItem[];
-    quantity: string;
-    unit: string;
-    notes: string;
-  }
+interface EditItemData {
+  item: string;
+  price: string;
+}
 
-  interface EditItemData {
-    item: string;
-    price: string;
-  }
+export function OrdersModule() {
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [availableItems, setAvailableItems] = useState<Item[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
 
-  export function OrdersModule() {
-    const [vendors, setVendors] = useState<Vendor[]>([]);
-    const [availableItems, setAvailableItems] = useState<Item[]>([]);
-    const [orders, setOrders] = useState<any[]>([]);
+  const [showPlaceOrderDialog, setShowPlaceOrderDialog] = useState(false);
+  const [showEditOrderDialog, setShowEditOrderDialog] = useState(false);
+  const [showViewOrderDialog, setShowViewOrderDialog] = useState(false);
 
-    const [showPlaceOrderDialog, setShowPlaceOrderDialog] = useState(false);
-    const [showEditOrderDialog, setShowEditOrderDialog] = useState(false);
-    const [showViewOrderDialog, setShowViewOrderDialog] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<any>(null);
+  const [viewingOrder, setViewingOrder] = useState<any>(null);
 
-    const [editingOrder, setEditingOrder] = useState<any>(null);
-    const [viewingOrder, setViewingOrder] = useState<any>(null);
-
-    const [orderFormData, setOrderFormData] = useState<OrderFormData>({
-      orderType: "single",
-      vendorId: "",
-      singleItemId: "",
-      bulkItems: [{ itemId: "", quantity: "", unit: "" }],
-      quantity: "",
-      unit: "",
-      notes: "",
-    });
-
-
-    const [editFormData, setEditFormData] = useState<EditItemData[]>([]);
-
-    // Fetch vendors
-    useEffect(() => {
-      vendorsApi
-        .getAll()
-        .then((data) => {
-          const arr = data.data || [];
-          setVendors(
-            arr
-              .filter((v: any) => v.vendor_id != null)
-              .map((v: any) => ({
-                id: String(v.vendor_id),
-                name: v.vendor_name || "Unnamed",
-              }))
-          );
-        })
-        .catch((err) => console.error("Vendor fetch error", err));
-    }, []);
-
-    // Fetch items
-    useEffect(() => {
-      itemsApi
-        .getAll()
-        .then((data) => {
-          const arr = data.data || [];
-          setAvailableItems(
-            arr
-              .filter((i: any) => i.item_id || i.id)
-              .map((i: any) => ({
-                id: String(i.item_id || i.id),
-                name: i.name || i.item_name || "Unnamed",
-              }))
-          );
-        })
-        .catch((err) => console.error("Items fetch error", err));
-    }, []);
-
-    // Fetch orders
-    const fetchOrders = () => {
-      ordersApi
-        .getAll()
-        .then((data) => {
-          const arr = Array.isArray(data) ? data : data.data || [data];
-          setOrders(
-            arr.map((o: any) => ({
-              id: o.order_id,
-              vendorName: o.vendor_name,
-              date: o.date,
-              items: o.items,
-              status: o.status,
-              totalAmount: o.total,
-              notes: o.notes || "",
-            }))
-          );
-        })
-        .catch((err) => console.error("Orders fetch error", err));
-    };
-
-    useEffect(() => {
-      fetchOrders();
-    }, []);
-
-    // 🔹 Place order
-    const handlePlaceOrder = async () => {
-      if (!orderFormData.vendorId) return toast.error("Select vendor");
-
-      let items: any[] = [];
-
-      if (orderFormData.orderType === "single") {
-        const selectedItem = availableItems.find(
-          (i) => i.id === orderFormData.singleItemId
-        );
-        if (!selectedItem) return toast.error("Select an item");
-
-        items = [
-          {
-            item: selectedItem.name || "Unnamed",
-            quantity: Number(orderFormData.quantity) || 0,
-            unit: orderFormData.unit,
-            price: Number(orderFormData.price) || 0,
-          },
-        ];
-      } else {
-        const validBulkItems = orderFormData.bulkItems.filter(
-          (i) => i.itemId && i.quantity
-        );
-        if (!validBulkItems.length)
-          return toast.error("Add at least one bulk item");
-
-        items = validBulkItems.map((i) => {
-          const selectedItem = availableItems.find((ai) => ai.id === i.itemId);
-          return {
-            item: selectedItem?.name || "Unnamed",
-            quantity: Number(i.quantity) || 0,
-            unit: i.unit,
-            price: Number(i.price) || 0,
-          };
-        });
-      }
-
-      const selectedVendor = vendors.find(
-        (v) => v.id === orderFormData.vendorId
-      );
-      if (!selectedVendor) return toast.error("Vendor not found");
-
-      const total = items.reduce((sum, i) => sum + (i.price || 0), 0);
-
-      const itemsForBackend = items.map((i) => ({
-        item_name: i.item,
-        quantity: i.quantity,
-        unit: i.unit,
-        price: i.price,
-      }));
-
-      try {
-    const res = await ordersApi.create({
-    vendor_name: selectedVendor.name,
-    date: new Date(),
-    status: "Pending",
-    total,
-    items: itemsForBackend,
+  const [orderFormData, setOrderFormData] = useState<OrderFormData>({
+    orderType: "single",
+    vendorId: "",
+    singleItemId: "",
+    bulkItems: [{ itemId: "", quantity: "", unit: "" }],
+    quantity: "",
+    unit: "",
+    notes: "",
   });
 
-        toast.success("Order placed successfully!");
-        setShowPlaceOrderDialog(false);
+  const [editFormData, setEditFormData] = useState<EditItemData[]>([]);
 
-        setOrderFormData({
-          orderType: "single",
-          vendorId: "",
-          singleItemId: "",
-          bulkItems: [{ itemId: "", quantity: "", unit: "" }],
-          quantity: "",
-          unit: "",
-          notes: "",
-        });
+  // Fetch vendors
+  useEffect(() => {
+    vendorsApi
+      .getAll()
+      .then((data) => {
+        const arr = data.data || [];
+        setVendors(
+          arr
+            .filter((v: any) => v.vendor_id != null)
+            .map((v: any) => ({
+              id: String(v.vendor_id),
+              name: v.vendor_name || "Unnamed",
+            }))
+        );
+      })
+      .catch((err) => console.error("Vendor fetch error", err));
+  }, []);
 
-        fetchOrders();
-      } catch (err: any) {
-        console.error(err);
-        toast.error(err.message);
-      }
-    }; // ✅ handlePlaceOrder properly closed
+  // Fetch items
+  useEffect(() => {
+    itemsApi
+      .getAll()
+      .then((data) => {
+        const arr = data.data || [];
+        setAvailableItems(
+          arr
+            .filter((i: any) => i.item_id || i.id)
+            .map((i: any) => ({
+              id: String(i.item_id || i.id),
+              name: i.name || i.item_name || "Unnamed",
+              unit: i.unit || "units", // ✅ store unit
+            }))
+        );
+      })
+      .catch((err) => console.error("Items fetch error", err));
+  }, []);
 
-    // 🔹 Edit order
+  // Fetch orders
+const fetchOrders = () => {
+  ordersApi
+    .getAll()
+    .then((data) => {
+      const arr = Array.isArray(data) ? data : data.data || [data];
+      setOrders(
+        arr.map((o: any) => ({
+          id: o.order_id,
+          vendorName: o.vendor_name,
+          date: o.date,
+          status: o.status,
+          totalAmount: o.total,
+          notes: o.notes || "",
+          items: (o.items || []).map((it: any) => {
+            // find matching item in availableItems to get its unit
+            const matched = availableItems.find(
+              (ai) =>
+                ai.id === String(it.item_id) ||
+                ai.name === it.item_name ||
+                ai.name === it.item
+            );
+            return {
+              ...it,
+              unit: it.unit || matched?.unit || "",
+            };
+          }),
+        }))
+      );
+    })
+    .catch((err) => console.error("Orders fetch error", err));
+};
+
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  // 🔹 Place order
+  const handlePlaceOrder = async () => {
+    if (!orderFormData.vendorId) return toast.error("Select vendor");
+
+    let items: any[] = [];
+
+    if (orderFormData.orderType === "single") {
+      const selectedItem = availableItems.find(
+        (i) => i.id === orderFormData.singleItemId
+      );
+      if (!selectedItem) return toast.error("Select an item");
+
+      items = [
+        {
+          item: selectedItem.name || "Unnamed",
+          quantity: Number(orderFormData.quantity) || 0,
+          unit: orderFormData.unit,
+          price: Number(orderFormData.price) || 0,
+        },
+      ];
+    } else {
+      const validBulkItems = orderFormData.bulkItems.filter(
+        (i) => i.itemId && i.quantity
+      );
+      if (!validBulkItems.length)
+        return toast.error("Add at least one bulk item");
+
+      items = validBulkItems.map((i) => {
+        const selectedItem = availableItems.find((ai) => ai.id === i.itemId);
+        return {
+          item: selectedItem?.name || "Unnamed",
+          quantity: Number(i.quantity) || 0,
+          unit: i.unit,
+          price: Number(i.price) || 0,
+        };
+      });
+    }
+
+    const selectedVendor = vendors.find(
+      (v) => v.id === orderFormData.vendorId
+    );
+    if (!selectedVendor) return toast.error("Vendor not found");
+
+    const total = items.reduce((sum, i) => sum + (i.price || 0), 0);
+
+    const itemsForBackend = items.map((i) => ({
+      item_name: i.item,
+      quantity: i.quantity,
+      unit: i.unit,
+      price: i.price,
+    }));
+
+    try {
+      await ordersApi.create({
+        
+        vendor_name: selectedVendor.name,
+        date: new Date(),
+        status: "Pending",
+        total,
+        notes: orderFormData.notes || "-",
+        items: itemsForBackend,
+      });
+
+      toast.success("Order placed successfully!");
+      setShowPlaceOrderDialog(false);
+
+      setOrderFormData({
+        orderType: "single",
+        vendorId: "",
+        singleItemId: "",
+        bulkItems: [{ itemId: "", quantity: "", unit: "" }],
+        quantity: "",
+        unit: "",
+        notes: "",
+      });
+
+      fetchOrders();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message);
+    }
+  };
+
+  // 🔹 Edit order
   const handleEditOrder = (order: any) => {
     setEditingOrder(order);
     setEditFormData(
@@ -258,13 +272,10 @@
     setShowEditOrderDialog(true);
   };
 
-
-
-    // 🔹 Update order
-
+  // 🔹 Update order
   const handleUpdateOrder = async () => {
     if (!editingOrder?.id) {
-      alert("Cannot update: no order selected");
+      toast.error("Cannot update: no order selected"); 
       return;
     }
 
@@ -272,6 +283,7 @@
       vendor_name: editingOrder.vendorName || "Unknown Vendor",
       status: "Completed",
       total: editFormData.reduce(
+        (sum, item) => sum + (Number(item.price) || 0),
         (sum, item) => sum + (Number(item.price) || 0),
         0
       ),
@@ -284,44 +296,41 @@
     };
 
     try {
-      await ordersApi.update(editingOrder.id, payload); // use id, not order_id
+      await ordersApi.update(editingOrder.id, payload);
+      toast.success("Order updated successfully!");
       setShowEditOrderDialog(false);
       fetchOrders();
     } catch (err: any) {
       console.error("Failed to update order:", err.response?.data || err.message);
-      alert("Failed to update order. Check console for details.");
+      toast.error("Failed to update order");
     }
   };
 
+  // 🔹 View order
+  const handleViewOrder = (order: any) => {
+    setViewingOrder(order);
+    setShowViewOrderDialog(true);
+  };
 
+  // 🔹 Bulk item helpers
+  const addBulkItem = () =>
+    setOrderFormData({
+      ...orderFormData,
+      bulkItems: [...orderFormData.bulkItems, { itemId: "", quantity: "", unit: "" }],
+    });
 
+  const removeBulkItem = (index: number) =>
+    setOrderFormData({
+      ...orderFormData,
+      bulkItems: orderFormData.bulkItems.filter((_, i) => i !== index),
+    });
 
+  const updateBulkItem = (index: number, field: string, value: string) => {
+    const newBulk = [...orderFormData.bulkItems];
+    (newBulk[index] as any)[field] = value;
+    setOrderFormData({ ...orderFormData, bulkItems: newBulk });
+  };
 
-
-    // 🔹 View order
-    const handleViewOrder = (order: any) => {
-      setViewingOrder(order);
-      setShowViewOrderDialog(true);
-    };
-
-    // 🔹 Bulk item helpers
-    const addBulkItem = () =>
-      setOrderFormData({
-        ...orderFormData,
-        bulkItems: [...orderFormData.bulkItems, { itemId: "", quantity: "", unit: "" }],
-      });
-
-    const removeBulkItem = (index: number) =>
-      setOrderFormData({
-        ...orderFormData,
-        bulkItems: orderFormData.bulkItems.filter((_, i) => i !== index),
-      });
-
-    const updateBulkItem = (index: number, field: string, value: string) => {
-      const newBulk = [...orderFormData.bulkItems];
-      (newBulk[index] as any)[field] = value;
-      setOrderFormData({ ...orderFormData, bulkItems: newBulk });
-    };
     return (
       <div className="space-y-6">
 
@@ -400,22 +409,15 @@
                         <Label>Quantity</Label>
                         <Input type="text" value={orderFormData.quantity} onChange={e => setOrderFormData({ ...orderFormData, quantity: e.target.value })} />
                       </div>
+<div>
+  <Label>Unit</Label>
+  <Input
+    type="text"
+    value={availableItems.find(i => i.id === orderFormData.singleItemId)?.unit || ''}
+    disabled
+  />
+</div>
 
-                      <div>
-                        <Label>Unit</Label>
-                        <Select value={orderFormData.unit} onValueChange={val => setOrderFormData({ ...orderFormData, unit: val })}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select unit" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {UNITS.map(u => (
-                              <SelectItem key={u} value={u}>
-                                {u}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
                     </div>
                   </div>
                 ) : (
@@ -445,18 +447,12 @@
 
                         <Input placeholder="Quantity" value={item.quantity} onChange={e => updateBulkItem(idx, 'quantity', e.target.value)} />
 
-                        <Select value={item.unit || ''} onValueChange={val => updateBulkItem(idx, 'unit', val)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Unit" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {UNITS.map(u => (
-                              <SelectItem key={u} value={u}>
-                                {u}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                       <Input
+  type="text"
+  value={availableItems.find(i => i.id === item.itemId)?.unit || ''}
+  disabled
+/>
+
 
                         {orderFormData.bulkItems.length > 1 && (
                           <Button size="sm" variant="outline" className="text-red-600" onClick={() => removeBulkItem(idx)}>
@@ -476,9 +472,16 @@
                 </div>
 
                 <div className="flex justify-end gap-2 pt-4">
-                  <Button variant="outline" onClick={() => setShowPlaceOrderDialog(false)}>
-                    Cancel
-                  </Button>
+                  <Button
+  variant="outline"
+  onClick={() => {
+    setShowPlaceOrderDialog(false);
+    toast.info("Order placement cancelled");   // ✅ added toast
+  }}
+>
+  Cancel
+</Button>
+
 
                   <Button onClick={handlePlaceOrder}>Place Order</Button>
                 </div>
@@ -508,6 +511,7 @@
               </TableHeader>
              <TableBody>
   {orders
+    .sort((a, b) => new Date(b.date) - new Date(a.date)) // ensure frontend sorts by actual order_id
     .sort((a, b) => new Date(b.date) - new Date(a.date)) // ensure frontend sorts by actual order_id
     .map((order, index) => (
       <TableRow key={order.id}>
@@ -607,6 +611,7 @@
                         <TableCell>{item.item || item.name || '-'}</TableCell>
                         <TableCell>{item.quantity || '-'}</TableCell>
                         <TableCell>{item.unit || '-'}</TableCell>
+
                         <TableCell>{item.price ? '₹' + item.price : '-'}</TableCell>
                       </TableRow>
                     ))}

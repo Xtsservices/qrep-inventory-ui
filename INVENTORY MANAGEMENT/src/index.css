@@ -119,6 +119,13 @@
     --color-border: var(--border);
   }
 }
+.badge-inactive {
+  @apply bg-black text-white;
+}
+
+button {
+  cursor: pointer;
+}
 
 button {
   cursor: pointer;

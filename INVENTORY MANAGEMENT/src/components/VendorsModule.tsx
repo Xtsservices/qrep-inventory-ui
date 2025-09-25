@@ -397,13 +397,13 @@ export function VendorsModule() {
           >
             <Eye className="w-4 h-4 mr-1" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDelete(vendor.vendor_id)}
-          >
-            <Trash className="w-4 h-4 mr-1" />
-          </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDelete(vendor.vendor_id)}
+            >
+              <Trash className="w-4 h-4 mr-1" />
+            </Button>
         </TableCell>
       </TableRow>
     ))

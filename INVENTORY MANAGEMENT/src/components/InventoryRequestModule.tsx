@@ -11,9 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Eye, Calendar as CalendarIcon, X, Plus } from "lucide-react";
 import { toast } from "sonner";
 
-// APIs
 import { inventoryRequestsApi, itemsApi } from "../api/api"; 
-// itemsApi.getAll() should return something like [{ id, name, price? , default_price? }, ...]
 
 export function InventoryRequestModule() {
   const [requests, setRequests] = useState<any[]>([]);
@@ -25,8 +23,7 @@ export function InventoryRequestModule() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
 
-  // dynamic items/pricing
-  const [availableItems, setAvailableItems] = useState<any[]>([]); // [{ id, name, price }]
+  const [availableItems, setAvailableItems] = useState<any[]>([]);
   const [itemPricing, setItemPricing] = useState<Record<string, number>>({});
 
   const [addFormData, setAddFormData] = useState({
@@ -34,16 +31,12 @@ export function InventoryRequestModule() {
     items: [{ name: "", quantity: "", price: 0 }]
   });
 
-  // helper to normalize API response -> array
   const normalizeArrayResponse = (res: any) => {
     if (Array.isArray(res)) return res;
     if (res == null) return [];
     if (Array.isArray(res.data)) return res.data;
-    // some backends return { data: { data: [...] } }
     if (res.data && Array.isArray(res.data.data)) return res.data.data;
-    // fallback: if res has keys that look like numeric indices, convert
     if (typeof res === "object") {
-      // try to find an array property
       for (const k of Object.keys(res)) {
         if (Array.isArray(res[k])) return res[k];
       }
@@ -51,7 +44,6 @@ export function InventoryRequestModule() {
     return [];
   };
 
-  // Fetch items dynamically (and build pricing map)
   useEffect(() => {
     const fetchItems = async () => {
       try {
@@ -74,9 +66,9 @@ export function InventoryRequestModule() {
     fetchItems();
   }, []);
 
-  // Fetch inventory requests from API
   useEffect(() => {
     const fetchRequests = async () => {
+      setLoading(true);
       setLoading(true);
       try {
         const res = await inventoryRequestsApi.getAll();
@@ -87,13 +79,24 @@ export function InventoryRequestModule() {
           requestedBy: r.requested_by || r.requestedBy || "Kitchen Staff",
           items: (r.items || []).map((i: any) => ({
             name: i.item_name ?? i.name,
+        const res = await inventoryRequestsApi.getAll();
+        const arr = normalizeArrayResponse(res);
+        const formatted = arr.map((r: any) => ({
+          id: r.id ?? r.request_id ?? r._id,
+          date: r.request_date ?? r.date ?? r.created_at,
+          requestedBy: r.requested_by || r.requestedBy || "Kitchen Staff",
+          items: (r.items || []).map((i: any) => ({
+            name: i.item_name ?? i.name,
             quantity: i.quantity,
             price: Number(i.price) || 0
+            price: Number(i.price) || 0
           })),
+          totalPrice: Number(r.total_price) || (r.items ? r.items.reduce((sum: number, i: any) => sum + Number(i.price || 0), 0) : 0),
           totalPrice: Number(r.total_price) || (r.items ? r.items.reduce((sum: number, i: any) => sum + Number(i.price || 0), 0) : 0),
         }));
         setRequests(formatted);
       } catch (err) {
+        console.error("Failed to load inventory requests:", err);
         console.error("Failed to load inventory requests:", err);
         toast.error("Failed to load inventory requests");
       } finally {
@@ -118,24 +121,15 @@ export function InventoryRequestModule() {
     }
   };
 
-  // update item row and auto-calc price using itemPricing map
+  // ✅ Updated: removed auto price calculation
   const updateItemRow = (index: number, field: string, value: any) => {
     const newItems = [...addFormData.items];
     newItems[index] = { ...newItems[index], [field]: value };
-
-    // Auto-calculate price if name + valid numeric quantity present
-    const itemName = newItems[index].name;
-    // extract numeric part from quantity string (e.g., "10 kg" -> 10)
-    const quantityNum = parseFloat(String(newItems[index].quantity).replace(/[^\d.]/g, "")) || 0;
-    if (itemName && quantityNum > 0 && itemPricing[itemName] && Number(itemPricing[itemName]) > 0) {
-      newItems[index].price = Math.round(quantityNum * Number(itemPricing[itemName]));
-    } else {
-      newItems[index].price = 0;
-    }
     setAddFormData({ ...addFormData, items: newItems });
   };
 
   const handleAddInventoryRequest = async () => {
+    const validItems = addFormData.items.filter(i => i.name && i.quantity && Number(i.price) > 0);
     const validItems = addFormData.items.filter(i => i.name && i.quantity && Number(i.price) > 0);
     if (!validItems.length) {
       toast.error("Please add at least one valid item");
@@ -151,7 +145,6 @@ export function InventoryRequestModule() {
       await inventoryRequestsApi.add(payload);
       toast.success("Inventory request added successfully!");
 
-      // Refresh list (normalized)
       const res = await inventoryRequestsApi.getAll();
       const arr = normalizeArrayResponse(res);
       const formatted = arr.map((r: any) => ({
@@ -162,14 +155,18 @@ export function InventoryRequestModule() {
           name: i.item_name ?? i.name,
           quantity: i.quantity,
           price: Number(i.price) || 0
+          price: Number(i.price) || 0
         })),
+        totalPrice: Number(r.total_price) || (r.items ? r.items.reduce((sum: number, i: any) => sum + Number(i.price || 0), 0) : 0),
         totalPrice: Number(r.total_price) || (r.items ? r.items.reduce((sum: number, i: any) => sum + Number(i.price || 0), 0) : 0),
       }));
       setRequests(formatted);
 
+
       setShowAddDialog(false);
       setAddFormData({ requestedBy: "Kitchen Staff", items: [{ name: "", quantity: "", price: 0 }] });
     } catch (err) {
+      console.error("Failed to add inventory request:", err);
       console.error("Failed to add inventory request:", err);
       toast.error("Failed to add inventory request");
     }
@@ -202,6 +199,7 @@ export function InventoryRequestModule() {
   });
 
   const totalValue = filteredRequests.reduce((sum, r) => sum + Number(r.totalPrice || 0), 0);
+  const totalValue = filteredRequests.reduce((sum, r) => sum + Number(r.totalPrice || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -210,7 +208,6 @@ export function InventoryRequestModule() {
           <p className="text-muted-foreground">Kitchen inventory requests by date</p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Add Inventory Button */}
           <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
             <DialogTrigger asChild>
               <Button><Plus className="w-4 h-4 mr-2" /> Add Inventory</Button>
@@ -238,6 +235,7 @@ export function InventoryRequestModule() {
                           <SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger>
                           <SelectContent>
                             {availableItems.map(i => <SelectItem key={i.id} value={i.name}>{i.name}</SelectItem>)}
+                            {availableItems.map(i => <SelectItem key={i.id} value={i.name}>{i.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
@@ -247,10 +245,20 @@ export function InventoryRequestModule() {
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Price</Label>
-                        <div className="h-10 px-3 py-2 bg-muted/30 border rounded-md flex items-center text-sm">{item.price > 0 ? `₹${item.price}` : "Auto-calculated"}</div>
+                        {/* ✅ Editable input instead of auto-calc */}
+                        <Input
+                          type="number"
+                          value={item.price}
+                          onChange={(e) => updateItemRow(index, "price", e.target.value)}
+                          placeholder="Enter amount"
+                        />
                       </div>
                       <div>
-                        {addFormData.items.length > 1 && <Button type="button" variant="outline" size="sm" className="text-red-600 hover:text-red-600" onClick={() => removeItemRow(index)}><X className="w-3 h-3" /></Button>}
+                        {addFormData.items.length > 1 && (
+                          <Button type="button" variant="outline" size="sm" className="text-red-600 hover:text-red-600" onClick={() => removeItemRow(index)}>
+                            <X className="w-3 h-3" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -263,7 +271,6 @@ export function InventoryRequestModule() {
             </DialogContent>
           </Dialog>
 
-          {/* Filter Popover */}
           <Popover>
             <PopoverTrigger asChild><Button variant="outline" size="sm"><CalendarIcon className="w-4 h-4 mr-2" /> Filter by Date</Button></PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
@@ -284,7 +291,9 @@ export function InventoryRequestModule() {
       <Card>
         <CardHeader>
           <CardTitle>Date-wise Requests</CardTitle>
-          <CardDescription>{filterMode === "all" ? "All requests" : `Showing ${filteredRequests.length} filtered requests`}</CardDescription>
+          <CardDescription>
+            {filterMode === "all" ? "All requests" : `Showing ${filteredRequests.length} filtered requests`}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? <p>Loading...</p> : (
@@ -325,7 +334,6 @@ export function InventoryRequestModule() {
         </CardContent>
       </Card>
 
-      {/* View Request Dialog */}
       <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -356,6 +364,7 @@ export function InventoryRequestModule() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
+                      {viewingRequest.items.map((item: any, idx: number) => (
                       {viewingRequest.items.map((item: any, idx: number) => (
                         <TableRow key={idx}>
                           <TableCell>{item.name}</TableCell>

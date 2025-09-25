@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import {
   BarChart,
@@ -21,7 +22,11 @@ export function DashboardOverview() {
   const [mostOrderedItems, setMostOrderedItems] = useState<any[]>([]);
   const [mostConsumedItems, setMostConsumedItems] = useState<any[]>([]);
   const [pieData, setPieData] = useState<any[]>([]);
+  const [pieData, setPieData] = useState<any[]>([]);
   const [lostStockCount, setLostStockCount] = useState(0);
+
+  // Color palette for pie chart
+  const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#AA00FF", "#FF0066", "#FF3366", "#33CCFF"];
 
   // Color palette for pie chart
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#AA00FF", "#FF0066", "#FF3366", "#33CCFF"];
@@ -32,7 +37,15 @@ useEffect(() => {
     try {
       const data = await itemsApi.getAll();
       if (!Array.isArray(data.data)) return;
+useEffect(() => {
+  const fetchItems = async () => {
+    try {
+      const data = await itemsApi.getAll();
+      if (!Array.isArray(data.data)) return;
 
+      const lost = data.data.filter((item: any) => Number(item.quantity || 0) <= 0).length;
+      setLostStockCount(lost);
+      setItemsCount(data.data.length);
       const lost = data.data.filter((item: any) => Number(item.quantity || 0) <= 0).length;
       setLostStockCount(lost);
       setItemsCount(data.data.length);
@@ -44,7 +57,32 @@ useEffect(() => {
         const qty = Number(item.quantity_consumed || item.quantity || 1);
         consumptionMap[name] = (consumptionMap[name] || 0) + qty;
       });
+      // 1️⃣ Aggregate by name first
+      const consumptionMap: Record<string, number> = {};
+      data.data.forEach((item: any) => {
+        const name = item.name || item.category || item.type || "Others";
+        const qty = Number(item.quantity_consumed || item.quantity || 1);
+        consumptionMap[name] = (consumptionMap[name] || 0) + qty;
+      });
 
+      // 2️⃣ Convert to array, sort descending, take top 5
+      const aggregatedArray = Object.entries(consumptionMap)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5);
+
+      // 3️⃣ Assign colors
+      const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#AA00FF", "#FF0066", "#FF3366", "#33CCFF"];
+      const finalArray = aggregatedArray.map((item, index) => ({
+        ...item,
+        fill: COLORS[index % COLORS.length],
+      }));
+
+      setMostConsumedItems(finalArray); // ✅ store fully aggregated & colored
+    } catch (error) {
+      console.error("Error fetching items:", error);
+    }
+  };
       // 2️⃣ Convert to array, sort descending, take top 5
       const aggregatedArray = Object.entries(consumptionMap)
         .map(([name, value]) => ({ name, value }))
@@ -78,6 +116,20 @@ useEffect(() => {
     }
   }, [mostConsumedItems]);
 
+  fetchItems();
+}, []);
+
+
+
+
+
+  useEffect(() => {
+    if (mostConsumedItems.length > 0) {
+      const timer = setTimeout(() => setPieData(mostConsumedItems), 100); // small delay triggers animation
+      return () => clearTimeout(timer);
+    }
+  }, [mostConsumedItems]);
+
 
   // ✅ Fetch vendors
   useEffect(() => {
@@ -94,48 +146,68 @@ useEffect(() => {
   }, []);
 
   // ✅ Fetch orders
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const data = await ordersApi.getAll();
-        const ordersArray = Array.isArray(data.data) ? data.data : [];
-        const orderCounts: Record<string, number> = {};
+// ✅ Fetch orders
+useEffect(() => {
+  const fetchOrders = async () => {
+    try {
+      const data = await ordersApi.getAll();
+      const ordersArray = Array.isArray(data.data) ? data.data : [];
+      const orderCounts: Record<string, number> = {};
 
-        ordersArray.forEach((order: any) => {
-          if (Array.isArray(order.items)) {
-            order.items.forEach((itemObj: any) => {
-              const itemName = itemObj.name || itemObj.item_name || itemObj.item;
-              const quantity = Number(itemObj.quantity) || 1;
-              if (itemName) orderCounts[itemName] = (orderCounts[itemName] || 0) + quantity;
-            });
-          }
-        });
+      ordersArray.forEach((order: any) => {
+        if (Array.isArray(order.items)) {
+          order.items.forEach((itemObj: any) => {
+            // Normalize possible keys
+            let itemName =
+              itemObj.name ||
+              itemObj.item_name ||
+              itemObj.item ||
+              itemObj.ItemName ||
+              itemObj.Item ||
+              "Unknown";
 
-        const itemsArray = Object.entries(orderCounts).map(([name, orders]) => ({ name, orders }));
-        itemsArray.sort((a, b) => b.orders - a.orders);
-        setMostOrderedItems(itemsArray.slice(0, 5));
-      } catch (error) {
-        console.error("Error fetching orders:", error);
+            // Clean and fallback
+            if (typeof itemName !== "string" || !itemName.trim()) {
+              itemName = "Unknown";
+            }
+            itemName = itemName.trim();
+
+            const quantity = Number(itemObj.quantity || itemObj.qty || 1);
+
+            // Count orders
+            orderCounts[itemName] = (orderCounts[itemName] || 0) + quantity;
+          });
+        }
+      });
+
+      // Convert to array and truncate long names for display
+      let itemsArray = Object.entries(orderCounts).map(([name, orders]) => {
+        // Show only first word or limit to 12 chars
+        let displayName = name.split(" ")[0]; // or: name.length > 12 ? name.slice(0,12) : name
+        return { name: displayName, orders };
+      });
+
+      // Sort descending
+      itemsArray.sort((a, b) => b.orders - a.orders);
+
+      // Fill to ensure 5 items in chart
+      while (itemsArray.length < 5) {
+        itemsArray.push({ name: "Unknown", orders: 0 });
       }
-    };
 
-    fetchOrders();
-  }, []);
+      setMostOrderedItems(itemsArray.slice(0, 5));
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+    }
+  };
 
-  // ✅ Aggregate consumed items to remove duplicates and assign unique colors
-  const aggregatedConsumedItems = useMemo(() => {
-    const map: Record<string, number> = {};
-    mostConsumedItems.forEach(item => {
-      map[item.name] = (map[item.name] || 0) + item.value;
-    });
-    return Object.entries(map).map(([name, value], index) => ({
-      name,
-      value,
-      fill: COLORS[index % COLORS.length],
-    }));
-  }, [mostConsumedItems]);
+  fetchOrders();
+}, []);
 
-  // Stats Cards Data
+
+
+
+  // ✅ Stats Cards Data (moved inside component)
   const statsData = [
     {
       title: "Total Items",
@@ -152,6 +224,12 @@ useEffect(() => {
       trend: "+3%",
     },
     {
+      title: "Lost Stock",
+      value: lostStockCount,
+      icon: AlertTriangle,
+      description: "Items out of stock",
+      trend: "-8%",
+    },
       title: "Lost Stock",
       value: lostStockCount,
       icon: AlertTriangle,
@@ -213,6 +291,24 @@ useEffect(() => {
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
+  <Pie
+    data={pieData}
+    cx="50%"
+    cy="50%"
+    labelLine={false}
+    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+    outerRadius={80}
+    dataKey="value"
+    isAnimationActive={true}      // ✅ enable animation
+    animationDuration={1500} 
+  >
+    {mostConsumedItems.map((entry, index) => (
+      <Cell key={`cell-${index}`} fill={entry.fill} />
+    ))}
+  </Pie>
+  <Tooltip />
+</PieChart>
+
   <Pie
     data={pieData}
     cx="50%"

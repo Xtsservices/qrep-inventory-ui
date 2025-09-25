@@ -3,7 +3,7 @@ import axios, { AxiosInstance, AxiosResponse } from "axios";
 
 
 // 🌍 Base URL
-const API_BASE_URL = "http://172.16.4.205:9000/api";
+const  BASE_URL = "http://localhost:9000/api";
 
 
 // Get token from localStorage
@@ -11,8 +11,8 @@ const getToken = () => localStorage.getItem("token");
 
 // Axios instance with token
 const axiosWithToken: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL,
-  headers: { "Content-Type": "application/json" },
+  baseURL: BASE_URL,
+  headers: { "Content-Type": "application/json" }, 
 });
 
 // Add token to each request

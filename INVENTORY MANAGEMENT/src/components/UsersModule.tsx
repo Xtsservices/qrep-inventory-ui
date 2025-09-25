@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import axios from 'axios';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -37,6 +38,7 @@ export function UsersModule() {
   const [userFormData, setUserFormData] = useState({ name: '', mobileNumber: '', email: '', role: '', status: 'Active' });
   const [editFormData, setEditFormData] = useState({ name: '', mobileNumber: '', email: '', role: '', status: 'Active' });
 
+const [openPopoverId, setOpenPopoverId] = useState<number | null>(null);
 // Fetch Users
   useEffect(() => {
     fetchUsers();
@@ -124,6 +126,8 @@ export function UsersModule() {
       if (res.success) {
         toast.success("User marked as inactive");
         fetchUsers();
+            setOpenPopoverId(null); // ✅ close popover after delete
+
       }
     } catch (err: any) {
       console.error(err);
@@ -195,7 +199,7 @@ export function UsersModule() {
                       <Button variant="ghost" size="sm" onClick={() => handleViewUser(user.id)}>
                         <Eye className="w-4 h-4" />
                       </Button>
-                      <AlertDialog>
+                      {/* <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
                             <Trash2 className="w-4 h-4" />
@@ -211,7 +215,53 @@ export function UsersModule() {
                             <AlertDialogAction onClick={() => handleDeleteUser(user.id)}>Yes, Mark Inactive</AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
-                      </AlertDialog>
+                      </AlertDialog> */}
+            <Popover
+  open={openPopoverId === user.id}
+  onOpenChange={(open) => setOpenPopoverId(open ? user.id : null)}
+>
+  <PopoverTrigger asChild>
+    <Button
+      variant="ghost"
+      size="sm"
+      className="text-destructive hover:text-destructive"
+      onClick={(e) => {
+        if (user.status === "Inactive") {
+          e.preventDefault(); // stop opening popover
+          toast.error("This user is already deleted/inactive");
+          return;
+        }
+        setOpenPopoverId(user.id); // open popover only if active
+      }}
+    >
+      <Trash2 className="w-4 h-4" />
+    </Button>
+  </PopoverTrigger>
+  <PopoverContent className="w-100" align="center" side="top">
+    <p className="text-sm mb-3">
+      Are you sure you want to mark <b>{user.name}</b> as inactive?
+    </p>
+    <div className="flex justify-end gap-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setOpenPopoverId(null)} // close on No
+      >
+        No
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        style={{ backgroundColor: "black", color: "#fff" }}
+        onClick={() => handleDeleteUser(user.id)}
+        className="hover:bg-black/80"
+      >
+        Yes
+      </Button>
+    </div>
+  </PopoverContent>
+</Popover>
+
                     </div>
                   </TableCell>
                 </TableRow>
@@ -240,7 +290,7 @@ export function UsersModule() {
             className={errors.name ? 'border-red-500 pr-8' : ''}
           />
           {errors.name && (
-            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-red-500">&#9888;</span>
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-red-600">&#9888;</span>
           )}
         </div>
         {errors.name && <p className="text-red-600 text-sm mt-1">{errors.name}</p>}
@@ -334,7 +384,8 @@ export function UsersModule() {
           {viewingUser && (
             <div className="space-y-4">
               <div className="flex items-center gap-4 p-4 bg-gray-100 rounded-lg">
-                <div className="w-12 h-12 rounded-full bg-black flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-white"
+  style={{ backgroundColor: "var(--color-black)" }}>
                   <span className="text-white text-xl font-bold">
                     {viewingUser.name ? viewingUser.name.charAt(0).toUpperCase() : '?'}
                   </span>
@@ -357,7 +408,7 @@ export function UsersModule() {
                 <Button variant="outline" onClick={() => setShowViewDialog(false)}>Close</Button>
                 <Button
   onClick={() => {
-    if (viewingUser.status === "Inactive") {
+    if (viewingUser.status === "Inactive ") {
       toast.error("This user is already deleted/inactive");
       return; // prevent going to edit mode
     }
