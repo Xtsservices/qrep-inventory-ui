@@ -71,7 +71,7 @@ const fetchTransactions = async () => {
           order_date: txn.order_date ? new Date(txn.order_date).toISOString() : null,
           vendor_name: txn.vendor_name || "N/A",
           items: txn.item_name ? [txn.item_name] : [],
-          amount: Number(txn.total || 0),
+          amount: Number(txn.cost || 0),
           status:
             txn.status === "Paid"
               ? "Completed"

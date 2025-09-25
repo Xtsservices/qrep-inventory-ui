@@ -10,13 +10,8 @@ import { Calendar } from "./ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Eye, Calendar as CalendarIcon, X, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { inventoryRequestsApi } from "../api/api";
 
-const availableItems = [
-  "Basmati Rice", "Toor Dal", "Refined Oil", "Onions",
-  "Turmeric Powder", "Wheat Flour", "Sugar", "Salt",
-  "Cumin Seeds", "Coriander Seeds"
-];
+import { inventoryRequestsApi, itemsApi } from "../api/api"; 
 
 export function InventoryRequestModule() {
   const [requests, setRequests] = useState<any[]>([]);
@@ -28,31 +23,65 @@ export function InventoryRequestModule() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
 
-  // dynamic items/pricing
-  const [availableItems, setAvailableItems] = useState<any[]>([]); // [{ id, name, price }]
+  const [availableItems, setAvailableItems] = useState<any[]>([]);
   const [itemPricing, setItemPricing] = useState<Record<string, number>>({});
 
   const [addFormData, setAddFormData] = useState({
     requestedBy: "Kitchen Staff",
-    items: [{ name: "", quantity: "", price: "" }]
+    items: [{ name: "", quantity: "", price: 0 }]
   });
 
-  // Fetch inventory requests from API
+  const normalizeArrayResponse = (res: any) => {
+    if (Array.isArray(res)) return res;
+    if (res == null) return [];
+    if (Array.isArray(res.data)) return res.data;
+    if (res.data && Array.isArray(res.data.data)) return res.data.data;
+    if (typeof res === "object") {
+      for (const k of Object.keys(res)) {
+        if (Array.isArray(res[k])) return res[k];
+      }
+    }
+    return [];
+  };
+
+  useEffect(() => {
+    const fetchItems = async () => {
+      try {
+        const res = await itemsApi.getAll();
+        const arr = normalizeArrayResponse(res);
+        const normalized = arr.map((i: any) => ({
+          id: i.item_id ?? i.id ?? i._id ?? String(i.name ?? Math.random()),
+          name: i.name ?? i.item_name ?? i.title ?? String(i.id ?? i.item_id ?? ""),
+          price: Number(i.price ?? i.default_price ?? i.unit_price ?? i.defaultPrice ?? 0),
+        }));
+        setAvailableItems(normalized);
+        const pricingMap: Record<string, number> = {};
+        normalized.forEach((it: any) => { pricingMap[it.name] = Number(it.price) || 0; });
+        setItemPricing(pricingMap);
+      } catch (err) {
+        console.error("Failed to fetch items list:", err);
+        toast.error("Failed to load items list");
+      }
+    };
+    fetchItems();
+  }, []);
+
   useEffect(() => {
     const fetchRequests = async () => {
       setLoading(true);
       try {
-        const data = await inventoryRequestsApi.getAll();
-        const formatted = data.map((r: any) => ({
-          id: r.id,
-          date: r.request_date ? new Date(r.request_date) : new Date(),
-          requestedBy: r.requested_by || "Kitchen Staff",
-          items: r.items.map((i: any) => ({
-            name: i.item_name,
+        const res = await inventoryRequestsApi.getAll();
+        const arr = normalizeArrayResponse(res);
+        const formatted = arr.map((r: any) => ({
+          id: r.id ?? r.request_id ?? r._id,
+          date: r.request_date ?? r.date ?? r.created_at,
+          requestedBy: r.requested_by || r.requestedBy || "Kitchen Staff",
+          items: (r.items || []).map((i: any) => ({
+            name: i.item_name ?? i.name,
             quantity: i.quantity,
             price: Number(i.price) || 0
           })),
-          totalPrice: Number(r.total_price) || r.items.reduce((sum: number, i: any) => sum + (Number(i.price) * Number(i.quantity)), 0),
+          totalPrice: Number(r.total_price) || (r.items ? r.items.reduce((sum: number, i: any) => sum + Number(i.price || 0), 0) : 0),
         }));
         setRequests(formatted);
       } catch (err) {
@@ -71,7 +100,7 @@ export function InventoryRequestModule() {
   };
 
   const addItemRow = () => {
-    setAddFormData({ ...addFormData, items: [...addFormData.items, { name: "", quantity: "", price: "" }] });
+    setAddFormData({ ...addFormData, items: [...addFormData.items, { name: "", quantity: "", price: 0 }] });
   };
 
   const removeItemRow = (index: number) => {
@@ -80,14 +109,15 @@ export function InventoryRequestModule() {
     }
   };
 
-  const updateItemRow = (index: number, field: string, value: string) => {
+  // ✅ Updated: removed auto price calculation
+  const updateItemRow = (index: number, field: string, value: any) => {
     const newItems = [...addFormData.items];
-    newItems[index][field] = value;  // keep as string
+    newItems[index] = { ...newItems[index], [field]: value };
     setAddFormData({ ...addFormData, items: newItems });
   };
 
   const handleAddInventoryRequest = async () => {
-    const validItems = addFormData.items.filter(i => i.name && i.quantity && Number(i.price) >= 0);
+    const validItems = addFormData.items.filter(i => i.name && i.quantity && Number(i.price) > 0);
     if (!validItems.length) {
       toast.error("Please add at least one valid item");
       return;
@@ -95,39 +125,30 @@ export function InventoryRequestModule() {
 
     const payload = {
       requested_by: addFormData.requestedBy,
-      items: addFormData.items
-        .filter(i => i.name && i.quantity && Number(i.price) >= 0)
-        .map(i => ({
-          item_name: i.name,
-          quantity: Number(i.quantity) || 0,
-          price: Number(i.price) || 0
-        }))
+      items: validItems.map(i => ({ item_name: i.name, quantity: i.quantity, price: i.price }))
     };
 
     try {
       await inventoryRequestsApi.add(payload);
       toast.success("Inventory request added successfully!");
 
-      // Refresh list
-      const data = await inventoryRequestsApi.getAll();
-      const formatted = data.map((r: any) => ({
-        id: r.id,
-        date: r.request_date ? new Date(r.request_date) : new Date(),
-        requestedBy: r.requested_by || "Kitchen Staff",
-        items: r.items.map((i: any) => ({
-          name: i.item_name,
-          quantity: Number(i.quantity) || 0,
+      const res = await inventoryRequestsApi.getAll();
+      const arr = normalizeArrayResponse(res);
+      const formatted = arr.map((r: any) => ({
+        id: r.id ?? r.request_id ?? r._id,
+        date: r.request_date ?? r.date ?? r.created_at,
+        requestedBy: r.requested_by || r.requestedBy || "Kitchen Staff",
+        items: (r.items || []).map((i: any) => ({
+          name: i.item_name ?? i.name,
+          quantity: i.quantity,
           price: Number(i.price) || 0
         })),
-        totalPrice:
-          Number(r.total_price) ||
-          r.items.reduce((sum: number, i: any) => sum + (Number(i.price) * Number(i.quantity)), 0),
+        totalPrice: Number(r.total_price) || (r.items ? r.items.reduce((sum: number, i: any) => sum + Number(i.price || 0), 0) : 0),
       }));
-
       setRequests(formatted);
 
       setShowAddDialog(false);
-      setAddFormData({ requestedBy: "Kitchen Staff", items: [{ name: "", quantity: "", price: "" }] });
+      setAddFormData({ requestedBy: "Kitchen Staff", items: [{ name: "", quantity: "", price: 0 }] });
     } catch (err) {
       console.error("Failed to add inventory request:", err);
       toast.error("Failed to add inventory request");
@@ -164,13 +185,11 @@ export function InventoryRequestModule() {
 
   return (
     <div className="space-y-6">
-      {/* Add Inventory & Filter Section */}
       <div className="flex justify-between items-start">
         <div>
           <p className="text-muted-foreground">Kitchen inventory requests by date</p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Add Inventory Button */}
           <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
             <DialogTrigger asChild>
               <Button><Plus className="w-4 h-4 mr-2" /> Add Inventory</Button>
@@ -203,14 +222,24 @@ export function InventoryRequestModule() {
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Quantity</Label>
-                        <Input value={item.quantity} onChange={e => updateItemRow(index, "quantity", e.target.value)} placeholder="e.g., 10" />
+                        <Input value={item.quantity} onChange={e => updateItemRow(index, "quantity", e.target.value)} placeholder="e.g., 10 kg" />
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Price</Label>
-                        <Input type="number" value={item.price} onChange={e => updateItemRow(index, "price", e.target.value)} placeholder="0" />
+                        {/* ✅ Editable input instead of auto-calc */}
+                        <Input
+                          type="number"
+                          value={item.price}
+                          onChange={(e) => updateItemRow(index, "price", e.target.value)}
+                          placeholder="Enter amount"
+                        />
                       </div>
                       <div>
-                        {addFormData.items.length > 1 && <Button type="button" variant="outline" size="sm" className="text-red-600 hover:text-red-600" onClick={() => removeItemRow(index)}><X className="w-3 h-3" /></Button>}
+                        {addFormData.items.length > 1 && (
+                          <Button type="button" variant="outline" size="sm" className="text-red-600 hover:text-red-600" onClick={() => removeItemRow(index)}>
+                            <X className="w-3 h-3" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -223,7 +252,6 @@ export function InventoryRequestModule() {
             </DialogContent>
           </Dialog>
 
-          {/* Filter Popover */}
           <Popover>
             <PopoverTrigger asChild><Button variant="outline" size="sm"><CalendarIcon className="w-4 h-4 mr-2" /> Filter by Date</Button></PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
@@ -241,11 +269,12 @@ export function InventoryRequestModule() {
         </div>
       </div>
 
-      {/* Requests Table */}
       <Card>
         <CardHeader>
           <CardTitle>Date-wise Requests</CardTitle>
-          <CardDescription>{filterMode === "all" ? "All requests" : `Showing ${filteredRequests.length} filtered requests`}</CardDescription>
+          <CardDescription>
+            {filterMode === "all" ? "All requests" : `Showing ${filteredRequests.length} filtered requests`}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? <p>Loading...</p> : (
@@ -286,7 +315,6 @@ export function InventoryRequestModule() {
         </CardContent>
       </Card>
 
-      {/* View Request Dialog */}
       <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>

@@ -21,18 +21,15 @@ export function ItemsModule() {
   const [formData, setFormData] = useState({
     name: '',
     type: '',
+    unit: 'units',
     status_id: '1',
-    quantity: '',
-    unit: '',
   });
   const [errors, setErrors] = useState({});
 
   const itemTypes = ['Grains', 'Pulses', 'Oil', 'Vegetables', 'Spices', 'Dairy', 'Others'];
-  const unitOptions = ['Units', 'Kg', 'g', 'L', 'ml'];
+  const unitTypes = ['kg', 'grams', 'liters', 'units'];
 
-  // -----------------------------
   // FETCH ITEMS
-  // -----------------------------
   const fetchItems = async () => {
     try {
       setLoading(true);
@@ -45,10 +42,9 @@ export function ItemsModule() {
           item_id: item.item_id ?? '',
           name: item.name ?? item.item_name ?? 'Unknown',
           type: item.type ?? '',
+          unit: item.unit ?? 'units',
           status_id,
           status: status_id === 1 ? 'Active' : 'Inactive',
-          quantity: Number(item.quantity) || 0,
-          unit: item.unit ?? '',
         };
       });
 
@@ -63,18 +59,13 @@ export function ItemsModule() {
 
   useEffect(() => { fetchItems(); }, []);
 
-  // -----------------------------
-  // FORM VALIDATION
-  // -----------------------------
+  // VALIDATION
   const validateField = (name, value) => {
     let error = '';
     if (name === 'name') {
       if (!value.trim()) error = 'Item name is required';
       else if (!/^[A-Za-z\s\-&()\.]+$/.test(value.trim()))
         error = 'Only alphabets and - & ( ) . are allowed';
-    }
-    if (name === 'quantity') {
-      if (!value || Number(value) <= 0) error = 'Quantity must be greater than zero';
     }
     if (name === 'type' && !value.trim()) error = 'Please select item type';
     if (name === 'unit' && !value.trim()) error = 'Please select unit';
@@ -83,7 +74,7 @@ export function ItemsModule() {
   };
 
   const validateForm = () => {
-    const fields = ['name', 'type', 'quantity', 'unit'];
+    const fields = ['name', 'type', 'unit'];
     let valid = true;
     fields.forEach((field) => {
       const value = formData[field] || '';
@@ -92,9 +83,7 @@ export function ItemsModule() {
     return valid;
   };
 
-  // -----------------------------
   // HANDLE CHANGE
-  // -----------------------------
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     if (errors[e.target.name]) validateField(e.target.name, e.target.value);
@@ -108,27 +97,16 @@ export function ItemsModule() {
     if (errors.unit) validateField('unit', value);
   };
 
-  // -----------------------------
-  // ADD / EDIT SUBMIT
-  // -----------------------------
+  // ADD / EDIT
   const handleSubmit = async () => {
     if (isSubmitting) return;
     if (!validateForm()) return;
 
-    const itemNameTrimmed = formData.name.trim();
-    const typeTrimmed = formData.type.trim();
-
-    if (!editingItem && items.some(i => i.name.toLowerCase() === itemNameTrimmed.toLowerCase())) {
-      toast.error(`Item "${itemNameTrimmed}" already exists!`);
-      return;
-    }
-
     const payload = {
-      name: itemNameTrimmed,
-      type: typeTrimmed,
+      name: formData.name.trim(),
+      type: formData.type.trim(),
+      unit: formData.unit.trim(),
       status_id: Number(formData.status_id || 1),
-      quantity: Number(formData.quantity) || 0,
-      unit: formData.unit,
     };
     if (editingItem) payload.item_id = editingItem.item_id;
 
@@ -143,7 +121,7 @@ export function ItemsModule() {
       }
       await fetchItems();
       handleCloseDialog();
-    } catch (err: any) {
+    } catch (err) {
       console.error("Submit error:", err);
       toast.error(err.response?.data?.error || err.message || "Something went wrong");
     } finally {
@@ -151,27 +129,20 @@ export function ItemsModule() {
     }
   };
 
-  // -----------------------------
   // EDIT
-  // -----------------------------
   const handleEdit = (item) => {
-    const normalizedType =
-      itemTypes.find((t) => t.toLowerCase() === (item.type ?? '').toLowerCase().trim()) || '';
     setEditingItem(item);
     setFormData({
       name: item.name ?? '',
-      type: normalizedType,
+      type: item.type ?? '',
+      unit: item.unit ?? 'units',
       status_id: item.status_id?.toString() ?? '1',
-      quantity: item.quantity ?? '',
-      unit: item.unit ?? '',
     });
     setErrors({});
     setShowDialog(true);
   };
 
-  // -----------------------------
-  // DELETE (soft delete)
-  // -----------------------------
+  // DELETE
   const handleDelete = async (item) => {
     if (!confirm(`Are you sure you want to mark "${item.name}" as Inactive?`)) return;
     try {
@@ -187,7 +158,7 @@ export function ItemsModule() {
   const handleCloseDialog = () => {
     setShowDialog(false);
     setEditingItem(null);
-    setFormData({ name: '', type: '', status_id: '1', quantity: '', unit: '' });
+    setFormData({ name: '', type: '', unit: 'units', status_id: '1' });
     setErrors({});
   };
 
@@ -195,9 +166,6 @@ export function ItemsModule() {
     statusFilter === 'all' ? true : item.status_id === Number(statusFilter)
   );
 
-  // -----------------------------
-  // RENDER
-  // -----------------------------
   return (
     <div className="space-y-6">
       {/* Header & Actions */}
@@ -229,6 +197,7 @@ export function ItemsModule() {
                   {editingItem ? 'Update item information' : 'Create a new inventory item'}
                 </div>
               </DialogHeader>
+
               <div className="space-y-4">
                 {/* Name */}
                 <div className="space-y-1">
@@ -243,38 +212,6 @@ export function ItemsModule() {
                     className={errors.name ? 'border-red-600' : ''}
                   />
                   {errors.name && <p className="text-red-600 text-xs">{errors.name}</p>}
-                </div>
-
-                {/* Quantity */}
-                <div className="flex gap-4">
-                  <div className="flex-1 space-y-1">
-                    <Label>Quantity *</Label>
-                    <Input
-                      type="number"
-                      name="quantity"
-                      value={formData.quantity}
-                      onChange={handleChange}
-                      onBlur={(e) => validateField(e.target.name, e.target.value)}
-                      placeholder="Enter quantity"
-                      min="0"
-                      className={errors.quantity ? 'border-red-600' : ''}
-                    />
-                    {errors.quantity && <p className="text-red-600 text-xs">{errors.quantity}</p>}
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <Label>Unit *</Label>
-                    <Select value={formData.unit} onValueChange={handleUnitChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select unit" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {unitOptions.map((u) => (
-                          <SelectItem key={u} value={u}>{u}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.unit && <p className="text-red-600 text-xs">{errors.unit}</p>}
-                  </div>
                 </div>
 
                 {/* Type */}
@@ -293,13 +230,33 @@ export function ItemsModule() {
                   {errors.type && <p className="text-red-600 text-xs">{errors.type}</p>}
                 </div>
 
+                {/* Unit */}
+                <div className="space-y-1">
+                  <Label htmlFor="unit">Unit *</Label>
+                  <Select value={formData.unit || ''} onValueChange={handleUnitChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unitTypes.map((u) => (
+                        <SelectItem key={u} value={u}>{u}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.unit && <p className="text-red-600 text-xs">{errors.unit}</p>}
+                </div>
+
                 {/* Buttons */}
                 <div className="flex justify-end gap-2 pt-4">
                   <Button variant="outline" onClick={handleCloseDialog} disabled={isSubmitting}>
                     Cancel
                   </Button>
                   <Button onClick={handleSubmit} disabled={isSubmitting}>
-                    {isSubmitting ? 'Saving...' : editingItem ? 'Update' : 'Add'} Item
+                    {isSubmitting ? (
+                      <span className="flex items-center gap-2">
+                        <div className="spinner spinner-sm"></div> Saving...
+                      </span>
+                    ) : editingItem ? 'Update' : 'Add'} Item
                   </Button>
                 </div>
               </div>
@@ -316,19 +273,22 @@ export function ItemsModule() {
         </CardHeader>
         <CardContent className="text-center">
           {loading ? (
-            <p className="py-8">Loading items...</p>
+            <div className="py-8 flex justify-center items-center gap-2">
+              <div className="spinner"></div>
+              <span>Loading items...</span>
+            </div>
           ) : filteredItems.length === 0 ? (
             <p className="text-muted-foreground py-8">No items found. Add your first item!</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead >S.No</TableHead>
-                  <TableHead >Name</TableHead>
-                  <TableHead >Type</TableHead>
-                  <TableHead >Quantity</TableHead>
-                  <TableHead >Status</TableHead>
-                  <TableHead >Actions</TableHead>
+                  <TableHead>S.No</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Units</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody className="text-left">
@@ -337,9 +297,7 @@ export function ItemsModule() {
                     <TableCell>{index + 1}</TableCell>
                     <TableCell>{item.name}</TableCell>
                     <TableCell>{item.type}</TableCell>
-                    <TableCell>
-                      {item.quantity > 0 ? `${item.quantity} ${item.unit}` : 'N/A'}
-                    </TableCell>
+                    <TableCell>{item.unit}</TableCell>
                     <TableCell>
                       <Badge variant={item.status_id === 1 ? 'success' : 'destructive'}>
                         {item.status}
