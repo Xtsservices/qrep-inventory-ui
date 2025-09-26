@@ -24,10 +24,9 @@ export function ItemsModule() {
     unit: 'units',
     status_id: '1',
   });
-  const [errors, setErrors] = useState({});
 
   const itemTypes = ['Grains', 'Pulses', 'Oil', 'Vegetables', 'Spices', 'Dairy', 'Others'];
-  const unitTypes = ['kg', 'grams', 'liters', 'units'];
+  const unitTypes = ["kg", "g","litre", "ml"];
 
   // FETCH ITEMS
   const fetchItems = async () => {
@@ -50,93 +49,51 @@ export function ItemsModule() {
 
       setItems(normalizedItems.reverse());
     } catch (err) {
-      console.error("Fetch items error:", err);
-      toast.error("Error fetching items");
-    } finally {
-      setLoading(false);
-    }
-  };
-      setItems(normalizedItems.reverse());
-    } catch (err) {
-      console.error("Fetch items error:", err);
-      toast.error("Error fetching items");
+      console.error('Fetch items error:', err);
+      toast.error('Error fetching items');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchItems(); }, []);
+  useEffect(() => {
+    fetchItems();
+  }, []);
 
-  // VALIDATION
-  const validateField = (name, value) => {
-    let error = '';
-    if (name === 'name') {
-      if (!value.trim()) error = 'Item name is required';
-      else if (!/^[A-Za-z\s\-&()\.]+$/.test(value.trim()))
-        error = 'Only alphabets and - & ( ) . are allowed';
-    }
-    if (name === 'type' && !value.trim()) error = 'Please select item type';
-    if (name === 'unit' && !value.trim()) error = 'Please select unit';
-    if (name === 'unit' && !value.trim()) error = 'Please select unit';
-    setErrors((prev) => ({ ...prev, [name]: error }));
-    return error === '';
-  };
-
-  const validateForm = () => {
-    const fields = ['name', 'type', 'unit'];
-    let valid = true;
-    fields.forEach((field) => {
-      const value = formData[field] || '';
-      if (!validateField(field, value)) valid = false;
-    });
-    return valid;
-  };
-
-  // HANDLE CHANGE
+  // HANDLE CHANGE (No validation)
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    if (errors[e.target.name]) validateField(e.target.name, e.target.value);
-  };
-  const handleTypeChange = (value) => {
-    setFormData({ ...formData, type: value });
-    if (errors.type) validateField('type', value);
-  };
-  const handleUnitChange = (value) => {
-    setFormData({ ...formData, unit: value });
-    if (errors.unit) validateField('unit', value);
-  };
-  const handleUnitChange = (value) => {
-    setFormData({ ...formData, unit: value });
-    if (errors.unit) validateField('unit', value);
   };
 
-  // ADD / EDIT
+  const handleTypeChange = (value) => setFormData({ ...formData, type: value });
+  const handleUnitChange = (value) => setFormData({ ...formData, unit: value });
+
+  // ADD / EDIT (No validation)
   const handleSubmit = async () => {
     if (isSubmitting) return;
-    if (!validateForm()) return;
 
     const payload = {
-      name: formData.name.trim(),
-      type: formData.type.trim(),
-      unit: formData.unit.trim(),
+      name: formData.name,
+      type: formData.type,
+      unit: formData.unit,
       status_id: Number(formData.status_id || 1),
+      ...(editingItem ? { item_id: editingItem.item_id } : {}),
     };
-    if (editingItem) payload.item_id = editingItem.item_id;
 
     setIsSubmitting(true);
     try {
       if (editingItem) {
         await itemsApi.update(editingItem.item_id, payload);
-        toast.success("Item updated successfully!");
+        toast.success('Item updated successfully!');
       } else {
         await itemsApi.add(payload);
-        toast.success("Item added successfully!");
+        toast.success('Item added successfully!');
       }
       await fetchItems();
       handleCloseDialog();
     } catch (err) {
-      console.error("Submit error:", err);
-      toast.error(err.response?.data?.error || err.message || "Something went wrong");
+      console.error('Submit error:', err);
+      toast.error(err.response?.data?.error || err.message || 'Something went wrong');
     } finally {
       setIsSubmitting(false);
     }
@@ -151,7 +108,6 @@ export function ItemsModule() {
       unit: item.unit ?? 'units',
       status_id: item.status_id?.toString() ?? '1',
     });
-    setErrors({});
     setShowDialog(true);
   };
 
@@ -172,7 +128,6 @@ export function ItemsModule() {
     setShowDialog(false);
     setEditingItem(null);
     setFormData({ name: '', type: '', unit: 'units', status_id: '1' });
-    setErrors({});
   };
 
   const filteredItems = items.filter((item) =>
@@ -214,22 +169,19 @@ export function ItemsModule() {
               <div className="space-y-4">
                 {/* Name */}
                 <div className="space-y-1">
-                  <Label htmlFor="name">Item Name *</Label>
+                  <Label htmlFor="name">Item Name</Label>
                   <Input
                     id="name"
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    onBlur={(e) => validateField(e.target.name, e.target.value)}
                     placeholder="Enter item name"
-                    className={errors.name ? 'border-red-600' : ''}
                   />
-                  {errors.name && <p className="text-red-600 text-xs">{errors.name}</p>}
                 </div>
 
                 {/* Type */}
                 <div className="space-y-1">
-                  <Label htmlFor="type">Item Type *</Label>
+                  <Label htmlFor="type">Item Type</Label>
                   <Select value={formData.type || ''} onValueChange={handleTypeChange}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select item type" />
@@ -240,12 +192,11 @@ export function ItemsModule() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {errors.type && <p className="text-red-600 text-xs">{errors.type}</p>}
                 </div>
 
                 {/* Unit */}
                 <div className="space-y-1">
-                  <Label htmlFor="unit">Unit *</Label>
+                  <Label htmlFor="unit">Unit</Label>
                   <Select value={formData.unit || ''} onValueChange={handleUnitChange}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select unit" />
@@ -256,7 +207,6 @@ export function ItemsModule() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {errors.unit && <p className="text-red-600 text-xs">{errors.unit}</p>}
                 </div>
 
                 {/* Buttons */}
@@ -265,11 +215,7 @@ export function ItemsModule() {
                     Cancel
                   </Button>
                   <Button onClick={handleSubmit} disabled={isSubmitting}>
-                    {isSubmitting ? (
-                      <span className="flex items-center gap-2">
-                        <div className="spinner spinner-sm"></div> Saving...
-                      </span>
-                    ) : editingItem ? 'Update' : 'Add'} Item
+                    {isSubmitting ? 'Saving...' : editingItem ? 'Update Item' : 'Add Item'}
                   </Button>
                 </div>
               </div>
@@ -305,7 +251,6 @@ export function ItemsModule() {
                 </TableRow>
               </TableHeader>
               <TableBody className="text-left">
-              <TableBody className="text-left">
                 {filteredItems.map((item, index) => (
                   <TableRow key={item.item_id ?? index}>
                     <TableCell>{index + 1}</TableCell>
@@ -317,16 +262,13 @@ export function ItemsModule() {
                         {item.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2 justify-left">
-                      <div className="flex gap-2 justify-left">
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(item)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                    <TableCell className="flex gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(item)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

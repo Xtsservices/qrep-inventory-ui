@@ -3,7 +3,7 @@ import axios, { AxiosInstance, AxiosResponse } from "axios";
 
 
 // 🌍 Base URL
-const  BASE_URL = "http://localhost:9000/api";
+const  BASE_URL = "http://172.16.4.96:9000/api";
 
 
 // Get token from localStorage

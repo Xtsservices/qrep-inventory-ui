@@ -55,23 +55,39 @@ export function FinanceModule() {
   });
 
   // Fetch transactions from API
+// Fetch transactions from API
 const fetchTransactions = async () => {
   try {
     const res = await financeApi.getAll();
     if (res.success) {
       const formattedTransactions: Transaction[] = res.data.map((txn: any, index: number) => {
-        // Use billing_id if available, otherwise fallback to order_id, otherwise generate a unique random ID
-        const idNumber =
-          txn.billing_id ||
-          txn.order_id ||
-          Math.floor(Math.random() * 1000000) + index; // index ensures uniqueness for duplicates
+        // Unique Transaction ID
+        const idNumber = txn.billing_id || txn.order_id || Math.floor(Math.random() * 1000000) + index;
+
+        // Handle items array and calculate total amount
+        let items: string[] = [];
+        let totalAmount = 0;
+
+        if (txn.items && Array.isArray(txn.items) && txn.items.length > 0) {
+          items = txn.items.map((item: any) => item.name || "Unknown Item");
+          totalAmount = txn.items.reduce(
+            (sum: number, item: any) => sum + (parseFloat(item.price) || 0),
+            0
+          );
+        } else if (txn.item_name) {
+          items = [txn.item_name];
+          totalAmount = parseFloat(txn.cost || "0");
+        }
+if (txn.status !== "Paid" && txn.order_status !== "Completed") {
+    totalAmount = 0;
+  }
 
         return {
           id: `TXN${idNumber}`,
           order_date: txn.order_date ? new Date(txn.order_date).toISOString() : null,
           vendor_name: txn.vendor_name || "N/A",
-          items: txn.item_name ? [txn.item_name] : [],
-          amount: Number(txn.cost || 0),
+          items,
+          amount: totalAmount,
           status:
             txn.status === "Paid"
               ? "Completed"
@@ -81,6 +97,8 @@ const fetchTransactions = async () => {
           notes: txn.notes || "",
         };
       });
+      
+
       setTransactions(formattedTransactions);
     }
   } catch (err) {
@@ -88,6 +106,7 @@ const fetchTransactions = async () => {
     toast.error("Failed to load transactions");
   }
 };
+
 
 
   useEffect(() => {
